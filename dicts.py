@@ -113,7 +113,7 @@ def axi_dicts_to_axi_responses(axi_dicts):
     write_ds = [d for d in axi_dicts if d['bvalid']]
     read_ds = [d for d in axi_dicts if d['rvalid']]
     write_responses = [
-        AxiResponse(length=1, data=None, resp=d['bresp']) for d in write_ds]
+        AxiResponse(length=1, data=[None], resp=d['bresp']) for d in write_ds]
     read_responses = [
-        AxiResponse(length=1, data=d['rdata'], resp=d['rresp']) for d in read_ds]
+        AxiResponse(length=1, data=[d['rdata']], resp=d['rresp']) for d in read_ds]
     return read_responses, write_responses
