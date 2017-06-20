@@ -2,9 +2,7 @@
 Python tools for creating and parsing AXI communications.
 '''
 
-import asyncio
 import logging
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -31,27 +29,27 @@ class Future:
     ERROR = 'error'
 
     def __init__(self):
-        self.result = None
-        self.exception = None
+        self.result_value = None
+        self.exception_value = None
         self.state = self.UNRESOLVED
 
     def set_result(self, result):
         assert(self.state == self.UNRESOLVED)
-        self.result = result
+        self.result_value = result
         self.state = self.OKAY
 
     def set_exception(self, exception):
         assert(self.state == self.UNRESOLVED)
-        self.exception = exception
+        self.exception_value = exception
         self.state = self.ERROR
 
     def result(self):
         if self.state == self.ERROR:
-            raise self.exception
+            raise self.exception_value
         elif self.state == self.UNRESOLVED:
             raise Exception('Future is unresolved')
         else:
-            return self.result
+            return self.result_value
 
 
 class Command(object):
