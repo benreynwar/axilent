@@ -4,6 +4,7 @@ setup(
     name = "axilent",
     packages=['axilent',
               ],
+    package_data={'axilent': ['cores/*.core', 'vhdl/*.vhd']},
     use_scm_version = {
         "relative_to": __file__,
         "write_to": "axilent/version.py",
