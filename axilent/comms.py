@@ -135,7 +135,7 @@ class AxiCommand(Command):
                     e = Exception('Bad response in "{}"'.format(self.description))
                     break
                 else:
-                    data.append(response.data)
+                    data += response.data
         if resolve_future:
             self.resolve_future(e, data)
         return (e, data)
