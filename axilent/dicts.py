@@ -1,6 +1,5 @@
 from collections import namedtuple
 
-from pyvivado import comms as pyvivado_comms
 from axilent import comms
 
 # Response code for AXI.
@@ -81,7 +80,7 @@ def make_axi4lite_s2m_dict(
 def axi_commands_to_axi_dicts(axi_commands):
     ds = []
     for ac in axi_commands:
-        if type(ac) in (comms.FakeWaitCommand, pyvivado_comms.FakeWaitCommand):
+        if type(ac) in (comms.FakeWaitCommand, ):
             for i in range(ac.clock_cycles):
                 ds.append(make_axi4lite_m2s_dict(bready=1, rready=1))
         else:
