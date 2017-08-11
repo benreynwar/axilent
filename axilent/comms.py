@@ -296,6 +296,7 @@ class FakeWaitCommand:
         self.clock_cycles = clock_cycles
         self.axi_commands = []
         self.sleep_time = sleep_time
+        self.length = 1
 
     def process_responses(self, responses):
         return None, None
