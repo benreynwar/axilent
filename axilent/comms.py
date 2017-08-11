@@ -98,16 +98,16 @@ class AxiCommand(Command):
         self.length = length
         self.readorwrite = readorwrite
         self.constant_address = constant_address
-        assert(readorwrite in (READ_TYPE, WRITE_TYPE))
+        assert readorwrite in (READ_TYPE, WRITE_TYPE)
         self.data = data
         if readorwrite == READ_TYPE:
-            assert(self.data is None)
+            assert self.data is None
         else:
-            assert(len(self.data) == length)
-        assert(start_address <= max_address)
+            assert len(self.data) == length
+        assert start_address <= max_address
         if not constant_address:
-            assert(start_address + length-1 <= max_address)
-        assert(description)
+            assert start_address + length-1 <= max_address
+        assert description
         super().__init__(description)
 
     def get_axi_commands(self):
@@ -216,7 +216,7 @@ class GetUnsignedCommand(AxiCommand):
 
     def process_responses(self, responses, resolve_future=True):
         e, result = super().process_responses(responses, resolve_future=False)
-        assert(len(result) == 1)
+        assert len(result) == 1
         if resolve_future:
             self.resolve_future(e, result[0])
         return e, result[0]

@@ -5,8 +5,7 @@ Python tools for creating and parsing AXI communications.
 import logging
 import time
 
-from axilent import dicts
-from pyvivado import comms
+from axilent import dicts, comms
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,8 @@ class ConnCommandHandler(object):
         '''
         Sends a Command objects to the FPGA and processes the responses.
         '''
-        rs = []
+        read_rs = []
+        write_rs = []
         for ac in command.get_axi_commands():
             if isinstance(ac, comms.FakeWaitCommand):
                 time.sleep(ac.sleep_time)
@@ -43,14 +43,14 @@ class ConnCommandHandler(object):
                             address=ac.start_address, data=ac.data)
                     else:
                         r = self.conn.write(address=ac.start_address, data=ac.data)
+                    write_rs.append(r)
                 else:
                     if ac.constant_address:
-                        raise Exception(
-                            'Reading from constant address not supported yet.')
+                        r = self.conn.read_repeat(address=ac.start_address, length=ac.length)
                     else:
                         r = self.conn.read(address=ac.start_address, length=ac.length)
-                rs.append(r)
-        command.process_response((None, rs))
+                    read_rs.append(r)
+        command.process_responses((read_rs, write_rs))
 
 
 class DictCommandHandler(object):
