@@ -2,9 +2,9 @@ from setuptools import setup
 
 setup(
     name = "axilent",
-    packages=['axilent',
+    packages=['axilent', 'axilent.examples',
               ],
-    package_data={'axilent': ['cores/*.core', 'vhdl/*.vhd']},
+    package_data={'': ['cores/*.core', 'vhdl/*.vhd']},
     use_scm_version = {
         "relative_to": __file__,
         "write_to": "axilent/version.py",
