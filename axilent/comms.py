@@ -129,13 +129,16 @@ class AxiCommand(Command):
             else:
                 response = relevant_responses.pop(0)
                 total_response_length += response.length
+                data += response.data
                 if total_response_length > self.length:
                     e = Exception('Response lengths not matching command lengths')
                 elif response.resp != OKAY:
                     e = Exception('Bad response in "{}"'.format(self.description))
-                    break
-                else:
-                    data += response.data
+        # Trim data down to right size.
+        # Do this so that incorrect size does not trigger errors that hide
+        # the real problem.
+        data = data[:self.length]
+        assert len(data) == self.length
         if resolve_future:
             self.resolve_future(e, data)
         return (e, data)
