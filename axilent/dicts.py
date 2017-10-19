@@ -109,6 +109,8 @@ AxiResponse = namedtuple('AxiResponse', ['length', 'data', 'resp'])
 
 
 def axi_dicts_to_axi_responses(axi_dicts):
+    assert all([d['bvalid'] is not None for d in axi_dicts])
+    assert all([d['rvalid'] is not None for d in axi_dicts])
     write_ds = [d for d in axi_dicts if d['bvalid']]
     read_ds = [d for d in axi_dicts if d['rvalid']]
     write_responses = [
