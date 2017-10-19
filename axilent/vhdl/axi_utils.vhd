@@ -8,6 +8,16 @@ package axi_utils is
   constant axi_resp_EXOKAY: std_logic_vector(1 downto 0) := "01";
   constant axi_resp_SLVERR: std_logic_vector(1 downto 0) := "10";
   constant axi_resp_DECERR: std_logic_vector(1 downto 0) := "11";
+
+  type axithrottle_t is
+  record
+    ar_open: std_logic;
+    r_open: std_logic;
+    aw_open: std_logic;
+    w_open: std_logic;
+    b_open: std_logic;
+  end record;
+  type array_of_axithrottles is array(natural range <>) of axithrottle_t;
   
   type axi4lite_m2s is
   record
