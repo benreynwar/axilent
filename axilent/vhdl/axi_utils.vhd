@@ -22,15 +22,15 @@ package axi_utils is
   type axi4lite_m2s is
   record
     araddr: std_logic_vector(31 downto 0); 
-    arprot: std_logic_vector(2 downto 0); -- not using
+    arprot: std_logic_vector(2 downto 0);
     arvalid: std_logic;
     awaddr: std_logic_vector(31 downto 0); 
-    awprot: std_logic_vector(2 downto 0); -- not using
+    awprot: std_logic_vector(2 downto 0);
     awvalid: std_logic; 
     bready: std_logic;
     rready: std_logic;
     wdata: std_logic_vector(31 downto 0); 
-    wstrb: std_logic_vector(3 downto 0); -- not using
+    wstrb: std_logic_vector(3 downto 0);
     wvalid: std_logic;
   end record;
   constant AXI4LITE_M2S_WIDTH: integer := 32 + 3 + 1 + 32 + 3 + 1 + 1 + 1 + 32 + 4 + 1;
