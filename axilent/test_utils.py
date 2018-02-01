@@ -22,14 +22,12 @@ class DictAxiTest(object):
         input_data = [{
             'reset': 1,
             'm2s': dicts.make_empty_axi4lite_m2s_dict(),
-            's2m': dicts.make_empty_axi4lite_s2m_dict(),
         }]
         self.axi_test.prepare(self.handler)
         m2s = self.handler.make_command_dicts()
         input_data += [{
             'reset': 0,
             'm2s': d,
-            's2m': dicts.make_empty_axi4lite_s2m_dict(),
             } for d in m2s]
         if self.terminate_early:
             input_data = input_data[:random.randint(1, len(input_data))]
