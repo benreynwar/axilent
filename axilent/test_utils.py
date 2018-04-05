@@ -35,6 +35,7 @@ class DictAxiTest(object):
 
     def check_output_data(self, input_data, output_data):
         if not self.terminate_early:
-            response_dicts = [d['s2m'] for d in output_data[1:]]
-            self.handler.consume_response_dicts(response_dicts)
+            ds = [{**ipt['m2s'], **opt['s2m']} for ipt, opt in zip(
+                input_data[1:], output_data[1:])]
+            self.handler.consume_response_dicts(ds)
             self.axi_test.check()

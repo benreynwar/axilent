@@ -111,10 +111,15 @@ AxiResponse = namedtuple('AxiResponse', ['length', 'data', 'resp'])
 def axi_dicts_to_axi_responses(axi_dicts):
     assert all([d['bvalid'] is not None for d in axi_dicts])
     assert all([d['rvalid'] is not None for d in axi_dicts])
-    write_ds = [d for d in axi_dicts if d['bvalid']]
-    read_ds = [d for d in axi_dicts if d['rvalid']]
+    # Make sure that no inputs got dropped.
+    assert all([d['arready'] for d in axi_dicts if d['arvalid']])
+    assert all([d['awready'] for d in axi_dicts if d['awvalid']])
+    assert all([d['wready'] for d in axi_dicts if d['wvalid']])
+    write_ds = [d for d in axi_dicts if d['bvalid'] and d['bready']]
+    read_ds = [d for d in axi_dicts if d['rvalid'] and d['rready']]
     write_responses = [
         AxiResponse(length=1, data=[None], resp=d['bresp']) for d in write_ds]
     read_responses = [
-        AxiResponse(length=1, data=[d['rdata']], resp=d['rresp']) for d in read_ds]
+        AxiResponse(length=1, data=[d['rdata']], resp=d['rresp'])
+        for d in read_ds]
     return read_responses, write_responses
