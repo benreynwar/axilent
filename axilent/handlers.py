@@ -33,6 +33,7 @@ class ConnCommandHandler(object):
         read_rs = []
         write_rs = []
         for ac in command.get_axi_commands():
+            logger.debug('Sending command for %s.', ac.description)
             if isinstance(ac, comms.FakeWaitCommand):
                 time.sleep(ac.sleep_time)
             else:
