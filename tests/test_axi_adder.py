@@ -12,7 +12,7 @@ def test_axi_adder():
     vu = slvcodec_config.setup_vunit(argv=['--dont-catch-exceptions'])
     for coretest in tests:
         test_utils.register_coretest_with_vunit(vu, coretest, testoutput_dir)
-    all_ok = vu._main()
+    all_ok = vu._main(post_run=None)
     assert all_ok
 
 if __name__ == '__main__':
