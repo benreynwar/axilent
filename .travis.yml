@@ -13,8 +13,7 @@ before_install:
   - sudo apt-get install -y llvm-3.5-dev llvm-3.5-tools libedit-dev
 
 before_script:
-  - pip install git+https://github.com/benreynwar/fusesoc_generators@d5559da9e2477dd4c0f86476c0b879ad09cfd73d#egg=fusesoc_generators-0.0.0
-  - pip install git+https://github.com/benreynwar/slvcodec@c4a7d7d5720a4001bd1d10f37800c973d8cb3da8#egg=slvcodec-0.0.0
+  - pip install --process-dependency-links git+https://github.com/benreynwar/slvcodec@bc39516d30f4695ef40db252d6cc5d8279b6ee4b#egg=slvcodec-0.0.0
   - pip install -e .
   - git clone --depth 1 https://github.com/tgingold/ghdl.git ghdl
   - cd ghdl
