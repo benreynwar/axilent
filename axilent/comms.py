@@ -3,6 +3,7 @@ Python tools for creating and parsing AXI communications.
 '''
 
 import logging
+from collections import namedtuple
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,9 @@ READ_TYPE = 'READ'
 WRITE_TYPE = 'WRITE'
 
 
+AxiResponse = namedtuple('AxiResponse', ['length', 'data', 'resp'])
+
+
 class Future:
 
     UNRESOLVED = 'unresolved'
@@ -34,12 +38,12 @@ class Future:
         self.state = self.UNRESOLVED
 
     def set_result(self, result):
-        assert(self.state == self.UNRESOLVED)
+        assert self.state == self.UNRESOLVED
         self.result_value = result
         self.state = self.OKAY
 
     def set_exception(self, exception):
-        assert(self.state == self.UNRESOLVED)
+        assert self.state == self.UNRESOLVED
         self.exception_value = exception
         self.state = self.ERROR
 
@@ -70,7 +74,7 @@ class Command(object):
             else:
                 self.future.set_result(result)
 
-    def process_responses(self, responses, resolve_future=True):
+    def process_responses(self, read_responses, write_responses, resolve_future=True):
         e, r = None, None
         if resolve_future:
             self.resolve_future(e, r)
@@ -113,8 +117,20 @@ class AxiCommand(Command):
     def get_axi_commands(self):
         return [self]
 
-    def process_responses(self, responses, resolve_future=True):
-        read_responses, write_responses = responses
+    def process_responses(self, read_responses, write_responses,
+                          resolve_future=True):
+        """
+        Arguments:
+          `read_responses`: An iterable of responses to read requests.  The
+            iterable must begin with the requests to this command, which will
+            be removed during processing.
+          `write_responses`: An iterable of responses to write requests.  The
+            iterable must begin with the requests to this command, which will
+            be removed during processing.
+          `resolve_future`: Whether the commands result future should be
+            resolved.  This should be False when this command is getting
+            wrapped by a higher level command.
+        """
         relevant_responses = {
             READ_TYPE: read_responses,
             WRITE_TYPE: write_responses,
@@ -131,9 +147,11 @@ class AxiCommand(Command):
                 total_response_length += response.length
                 data += response.data
                 if total_response_length > self.length:
-                    e = Exception('Response lengths not matching command lengths')
+                    e = Exception(
+                        'Response lengths not matching command lengths')
                 elif response.resp != OKAY:
-                    e = Exception('Bad response in "{}"'.format(self.description))
+                    e = Exception(
+                        'Bad response in "{}"'.format(self.description))
         # Trim data down to right size.
         # Do this so that incorrect size does not trigger errors that hide
         # the real problem.
@@ -146,9 +164,10 @@ class AxiCommand(Command):
 
 class SetUnsignedsCommand(AxiCommand):
 
-    def __init__(self, values, address, description=None, constant_address=False):
+    def __init__(self, values, address, description=None,
+                 constant_address=False):
         for value in values:
-            assert(value < pow(2, 32))
+            assert value < pow(2, 32)
         super().__init__(
             start_address=address,
             length=len(values),
@@ -172,7 +191,8 @@ class SetUnsignedCommand(SetUnsignedsCommand):
 
 class SetSignedsCommand(SetUnsignedsCommand):
 
-    def __init__(self, values, address, description=None, constant_address=False):
+    def __init__(self, values, address, description=None,
+                 constant_address=False):
         offset = pow(2, 32)
         unsigneds = [v+offset if v < 0 else v for v in values]
         super().__init__(
@@ -196,7 +216,8 @@ class SetSignedCommand(SetSignedsCommand):
 
 class GetUnsignedsCommand(AxiCommand):
 
-    def __init__(self, address, length=1, constant_address=False, description=None):
+    def __init__(self, address, length=1, constant_address=False,
+                 description=None):
         super().__init__(
             start_address=address,
             length=length,
@@ -217,8 +238,10 @@ class GetUnsignedCommand(AxiCommand):
             description=description,
         )
 
-    def process_responses(self, responses, resolve_future=True):
-        e, result = super().process_responses(responses, resolve_future=False)
+    def process_responses(self, read_responses, write_responses,
+                          resolve_future=True):
+        e, result = super().process_responses(read_responses, write_responses,
+                                              resolve_future=False)
         assert len(result) == 1
         if resolve_future:
             self.resolve_future(e, result[0])
@@ -249,8 +272,10 @@ class GetBooleanCommand(AxiCommand):
             description=description,
         )
 
-    def process_responses(self, responses, resolve_future=True):
-        e, result = super().process_responses(responses, resolve_future=False)
+    def process_responses(self, read_responses, write_responses,
+                          resolve_future=True):
+        e, result = super().process_responses(read_responses, write_responses,
+                                              resolve_future=False)
         r = None
         if not e:
             if len(result) != 1:
@@ -262,8 +287,8 @@ class GetBooleanCommand(AxiCommand):
                 elif first_result == 0:
                     r = False
                 else:
-                    e = Exception('Return value must be 0 to 1 for boolean.  Is {}'.format(
-                        result))
+                    msg = 'Return value must be 0 to 1 for boolean.  Is {}.'
+                    e = Exception(msg.format(result))
         if resolve_future:
             self.resolve_future(e, r)
         return (e, r)
@@ -301,7 +326,8 @@ class FakeWaitCommand:
         self.sleep_time = sleep_time
         self.length = 1
 
-    def process_responses(self, responses):
+    def process_responses(self, read_responses, write_responses,
+                          resolve_future=False):
         return None, None
 
     def get_axi_commands(self):
@@ -320,11 +346,13 @@ class CombinedCommand(Command):
             acs += command.get_axi_commands()
         return acs
 
-    def process_responses(self, responses, resolve_future=True):
+    def process_responses(self, read_responses, write_responses,
+                          resolve_future=True):
         first_e = None
         results = []
         for command in self.commands:
-            e, result = command.process_responses(responses)
+            e, result = command.process_responses(
+                read_responses, write_responses)
             if (e is not None) and (first_e is None):
                 first_e = e
             results.append(result)

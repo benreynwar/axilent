@@ -1,5 +1,3 @@
-from collections import namedtuple
-
 from axilent import comms
 
 # Response code for AXI.
@@ -105,9 +103,6 @@ def axi_commands_to_axi_dicts(axi_commands):
     return ds
 
 
-AxiResponse = namedtuple('AxiResponse', ['length', 'data', 'resp'])
-
-
 def axi_dicts_to_axi_responses(axi_dicts):
     assert all([d['bvalid'] is not None for d in axi_dicts])
     assert all([d['rvalid'] is not None for d in axi_dicts])
@@ -118,8 +113,8 @@ def axi_dicts_to_axi_responses(axi_dicts):
     write_ds = [d for d in axi_dicts if d['bvalid'] and d['bready']]
     read_ds = [d for d in axi_dicts if d['rvalid'] and d['rready']]
     write_responses = [
-        AxiResponse(length=1, data=[None], resp=d['bresp']) for d in write_ds]
+        comms.AxiResponse(length=1, data=[None], resp=d['bresp']) for d in write_ds]
     read_responses = [
-        AxiResponse(length=1, data=[d['rdata']], resp=d['rresp'])
+        comms.AxiResponse(length=1, data=[d['rdata']], resp=d['rresp'])
         for d in read_ds]
     return read_responses, write_responses

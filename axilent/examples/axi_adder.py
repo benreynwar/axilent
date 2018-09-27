@@ -89,8 +89,6 @@ class AxiAdderTest(object):
     def prepare(self, handler):
         '''
         Sends a number of 'add_numbers' commands.
-        Returns a list of futures for the results and a list
-        of the expected values.
         '''
         comm = AxiAdderComm(address_offset=0, handler=handler)
         n_data = 20
