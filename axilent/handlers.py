@@ -51,7 +51,7 @@ class ConnCommandHandler(object):
                     else:
                         r = self.conn.read(address=ac.start_address, length=ac.length)
                     read_rs.append(r)
-        command.process_responses((read_rs, write_rs))
+        command.process_responses(read_rs, write_rs)
 
 
 class DictCommandHandler(object):
@@ -81,13 +81,13 @@ class DictCommandHandler(object):
             self.sent_commands.append(command)
         return axi_commands
 
-    def process_responses(self, responses):
+    def process_responses(self, read_responses, write_responses):
         for command in self.sent_commands:
-            command.process_responses(responses)
+            command.process_responses(read_responses, write_responses)
 
     def consume_response_dicts(self, ds):
-        responses = dicts.axi_dicts_to_axi_responses(ds)
-        self.process_responses(responses)
+        read_responses, write_responses = dicts.axi_dicts_to_axi_responses(ds)
+        self.process_responses(read_responses, write_responses)
 
     def make_command_dicts(self):
         acs = self.get_axi_commands()

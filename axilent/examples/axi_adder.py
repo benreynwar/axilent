@@ -68,12 +68,12 @@ class AddNumbersCommand(comms.CombinedCommand):
             description='Add 2 numbers with AddNumber',
             commands=commands)
 
-    def process_responses(self, responses, resolve_future=True):
+    def process_responses(self, read_responses, write_responses, resolve_future=True):
         '''
         Return the third response (from the final read command)
         Don't return any errors.
         '''
-        e, result = super().process_responses(responses, resolve_future=False)
+        e, result = super().process_responses(read_responses, write_responses, resolve_future=False)
         intc = result[2]
         if resolve_future:
             self.resolve_future(e, intc)
