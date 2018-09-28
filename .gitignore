@@ -1,0 +1,10 @@
+*.pyc
+*.jou
+*.log
+axilent/version.py
+test_outputs
+vunit_out
+\#*
+.cache
+.eggs
+axilent.egg-info
