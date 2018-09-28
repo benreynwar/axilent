@@ -1,3 +1,6 @@
+.. image:: https://travis-ci.org/benreynwar/axilent.svg?branch=master
+               :target: https://travis-ci.org/benreynwar/axilent
+
 axilent
 =======
 

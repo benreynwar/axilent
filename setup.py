@@ -8,6 +8,7 @@ setup(
         'relative_to': __file__,
         'write_to': 'axilent/version.py',
     },
+    setup_requires=['setuptools_scm'],
     author='Ben Reynwar',
     author_email='ben@reynwar.net',
     description=(''),
