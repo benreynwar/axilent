@@ -93,3 +93,52 @@ class DictCommandHandler(object):
         acs = self.get_axi_commands()
         ads = dicts.axi_commands_to_axi_dicts(acs)
         return ads
+
+
+class PYNQHandler(object):
+    '''
+    This handler receives `Command` objects and sends their AXI
+    commands over the passed in PYNQ DefaultIP driver.
+
+    This handler is useful to simplify communication with the FPGA.
+    '''
+
+    def __init__(self, driver):
+        '''
+        `driver`: A PYNQ DefaultIP driver with `read` and `write` methods.
+                The passed driver has addresses indexing bytes, whereas
+                this handler assumes addresses index 32 bits.
+        '''
+        self.driver = driver
+
+    def send(self, command):
+        '''
+        Sends a Command objects to the FPGA and processes the responses.
+        '''
+        read_rs = []
+        write_rs = []
+        for ac in command.get_axi_commands():
+            logger.debug('Command sent for %s.', ac.description)
+            if isinstance(ac, comms.FakeWaitCommand):
+                time.sleep(ac.sleep_time)
+            else:
+                assert(ac.readorwrite in (comms.WRITE_TYPE, comms.READ_TYPE))
+                if ac.readorwrite == comms.WRITE_TYPE:
+                    if ac.constant_address:
+                        for d in ac.data:
+                            self.driver.write(ac.start_address*4, d)
+                            write_rs.append(dicts.AxiResponse(length=1, data=[None], resp=0))
+                    else:
+                        for offset, d in enumerate(ac.data):
+                            self.driver.write((ac.start_address+offset)*4, d)
+                            write_rs.append(dicts.AxiResponse(length=1, data=[None], resp=0))
+                else:
+                    if ac.constant_address:
+                        for index in range(ac.length):
+                            response = self.driver.read(ac.start_address*4)
+                            read_rs.append(dicts.AxiResponse(length=1, data=[response], resp=0))
+                    else:
+                        for index in range(ac.length):
+                            response = self.driver.read((ac.start_address+index)*4)
+                            read_rs.append(dicts.AxiResponse(length=1, data=[response], resp=0))
+        command.process_responses((read_rs, write_rs))

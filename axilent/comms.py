@@ -320,11 +320,16 @@ class FakeWaitCommand:
     a sleep time.  This is for compatibility of tests.
     '''
 
-    def __init__(self, clock_cycles, sleep_time=0):
+    def __init__(self, clock_cycles, sleep_time=0, description=None):
         self.clock_cycles = clock_cycles
         self.axi_commands = []
         self.sleep_time = sleep_time
         self.length = 1
+        if description is None:
+            self.description = 'Fake wait for {} clock cycles / {} time'.format(
+                clock_cycles, sleep_time)
+        else:
+            self.description = description
 
     def process_responses(self, read_responses, write_responses,
                           resolve_future=False):
