@@ -127,18 +127,18 @@ class PYNQHandler(object):
                     if ac.constant_address:
                         for d in ac.data:
                             self.driver.write(ac.start_address*4, d)
-                            write_rs.append(dicts.AxiResponse(length=1, data=[None], resp=0))
+                            write_rs.append(comms.AxiResponse(length=1, data=[None], resp=0))
                     else:
                         for offset, d in enumerate(ac.data):
                             self.driver.write((ac.start_address+offset)*4, d)
-                            write_rs.append(dicts.AxiResponse(length=1, data=[None], resp=0))
+                            write_rs.append(comms.AxiResponse(length=1, data=[None], resp=0))
                 else:
                     if ac.constant_address:
                         for index in range(ac.length):
                             response = self.driver.read(ac.start_address*4)
-                            read_rs.append(dicts.AxiResponse(length=1, data=[response], resp=0))
+                            read_rs.append(comms.AxiResponse(length=1, data=[response], resp=0))
                     else:
                         for index in range(ac.length):
                             response = self.driver.read((ac.start_address+index)*4)
-                            read_rs.append(dicts.AxiResponse(length=1, data=[response], resp=0))
-        command.process_responses((read_rs, write_rs))
+                            read_rs.append(comms.AxiResponse(length=1, data=[response], resp=0))
+        command.process_responses(read_rs, write_rs)
