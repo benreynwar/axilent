@@ -26,10 +26,14 @@ WRITE_TYPE = 'WRITE'
 AxiResponse = namedtuple('AxiResponse', ['length', 'data', 'resp'])
 
 
+class AxiResponseException(Exception):
+    pass
+
+
 class Future:
 
     UNRESOLVED = 'unresolved'
-    OKAY = 'okey'
+    OKAY = 'okay'
     ERROR = 'error'
 
     def __init__(self):
@@ -150,7 +154,7 @@ class AxiCommand(Command):
                     e = Exception(
                         'Response lengths not matching command lengths')
                 elif response.resp != OKAY:
-                    e = Exception(
+                    e = AxiResponseException(
                         'Bad response in "{}"'.format(self.description))
         # Trim data down to right size.
         # Do this so that incorrect size does not trigger errors that hide
