@@ -1,0 +1,14 @@
+CAPI=2:
+
+name : ::axi_utils
+description: Utilities for axi types
+
+filesets:
+  default:
+    files:
+      - axi_utils.vhd
+    file_type: vhdlSource
+
+targets:
+  default:
+    filesets : [default]

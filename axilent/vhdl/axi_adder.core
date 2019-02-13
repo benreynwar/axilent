@@ -1,0 +1,16 @@
+CAPI=2:
+
+name : ::axi_adder
+description: Example core for adding two numbers with AXI interface.
+
+filesets:
+  default:
+    files:
+      - axi_adder.vhd
+    file_type: vhdlSource
+    depend:
+      - axi_utils
+
+targets:
+  default:
+    filesets : [default]

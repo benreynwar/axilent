@@ -1,9 +1,0 @@
-CAPI=1
-[main]
-name = axi_utils
-description = Utilities for axi types
-
-[fileset rtl]
-files =
-  ../vhdl/axi_utils.vhd
-file_type = vhdlSource
