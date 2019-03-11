@@ -19,7 +19,7 @@ setup(
     author_email='ben@reynwar.net',
     description=('Tools for describing a sequence of Axi4Lite command'),
     long_description=long_description,
-    long_description_content_type='text/rst',
+    long_description_content_type='text/x-rst',
     license='MIT',
     keywords=['VHDL', 'hdl', 'rtl', 'FPGA', 'ASIC', 'Xilinx', 'Altera'],
     url='https://github.com/benreynwar/axilent',
