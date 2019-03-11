@@ -1,5 +1,10 @@
 from setuptools import setup
 
+this_directory = path.abspath(path.dirname(__file__))
+with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
+
+
 setup(
     name='axilent',
     packages=['axilent', 'axilent.examples'],
@@ -11,7 +16,8 @@ setup(
     setup_requires=['setuptools_scm'],
     author='Ben Reynwar',
     author_email='ben@reynwar.net',
-    description=(''),
+    description=('Tools for describing a sequence of Axi4Lite command'),
+    long_description=long_description,
     license='MIT',
     keywords=['VHDL', 'hdl', 'rtl', 'FPGA', 'ASIC', 'Xilinx', 'Altera'],
     url='https://github.com/benreynwar/axilent',
