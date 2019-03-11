@@ -1,7 +1,8 @@
+import os
 from setuptools import setup
 
-this_directory = path.abspath(path.dirname(__file__))
-with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
+this_directory = os.path.abspath(os.path.dirname(__file__))
+with open(os.path.join(this_directory, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 
@@ -18,6 +19,7 @@ setup(
     author_email='ben@reynwar.net',
     description=('Tools for describing a sequence of Axi4Lite command'),
     long_description=long_description,
+    long_description_content_type='text/rst',
     license='MIT',
     keywords=['VHDL', 'hdl', 'rtl', 'FPGA', 'ASIC', 'Xilinx', 'Altera'],
     url='https://github.com/benreynwar/axilent',
