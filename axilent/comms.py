@@ -147,7 +147,7 @@ class AxiCommand(Command):
                 e = Exception('Ran out of responses')
                 break
             else:
-                response = relevant_responses.pop(0)
+                response = relevant_responses.popleft()
                 total_response_length += response.length
                 data += response.data
                 if total_response_length > self.length:

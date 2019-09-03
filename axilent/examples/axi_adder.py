@@ -1,7 +1,7 @@
 import logging
 import random
 
-from slvcodec.test_utils import WrapperTest
+from slvcodec.test_utils import WrapperTest, TriggerOnFuture
 from axilent.test_utils import DictAxiTest
 from axilent import comms
 
@@ -81,6 +81,10 @@ class AddNumbersCommand(comms.CombinedCommand):
 
 
 class AxiAdderTest(object):
+    """
+    This is a test with the restriction that all the inputs must be specified before any
+    out of the outputs are received.
+    """
 
     def __init__(self):
         self.expected_intcs = []
@@ -111,6 +115,24 @@ class AxiAdderTest(object):
         output_intcs = [f.result() for f in self.intc_futures]
         assert output_intcs == self.expected_intcs
         print('Success!!!!!!!!!!!!!!!')
+
+
+def axi_adder_pipe_test(handler):
+    """
+    In this test outputs are received immediately after sending inputs.
+    Inputs cannot depend combinatorially on outputs.
+    """
+    comm = AxiAdderComm(address_offset=0, handler=handler)
+    n_data = 20
+    max_int = pow(2, 16)-1
+    logger.debug('preparing data')
+    for i in range(n_data):
+        logger.debug('Running test at index {}'.format(i))
+        inta = random.randint(0, max_int)
+        intb = random.randint(0, max_int)
+        future = comm.add_numbers(inta, intb)
+        yield TriggerOnFuture(future)
+        assert future.result == inta + intb
 
 
 def make_test(entity, generics, top_params):
