@@ -3,7 +3,7 @@ import logging
 import shutil
 
 from slvcodec import config as slvcodec_config, test_utils, event
-from axilent.examples import axi_adder, axi_adder_pipe
+from axilent.examples import axi_adder
 from axilent import coresdir, handlers, config
 
 testoutput_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'test_outputs'))
@@ -38,14 +38,12 @@ def test_axi_adder_pipe():
     simulator = event.Simulator(directory, filenames, top_entity, generics)
     loop = event.EventLoop(simulator)
     handler = handlers.NamedPipeHandler(
-        dut=simulator.dut,
         loop=loop,
-        in_name='m2s',
-        out_name='s2m',
+        m2s=simulator.dut.m2s,
+        s2m=simulator.dut.s2m,
         )
-
     loop.create_task(handler.communicate())
-    loop.create_task(axi_adder.axi_adder_test(handler))
+    loop.create_task(axi_adder.axi_adder_test(simulator.dut, handler))
     loop.run_forever()
 
 
