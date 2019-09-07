@@ -1,7 +1,9 @@
 import logging
 import random
+import asyncio
 
-from slvcodec.test_utils import WrapperTest, TriggerOnFuture
+from slvcodec.test_utils import WrapperTest
+from slvcodec import event
 from axilent.test_utils import DictAxiTest
 from axilent import comms
 
@@ -41,6 +43,17 @@ class AxiAdderComm(object):
         command = AddNumbersCommand(a, b, self.addresses)
         self.handler.send(command)
         return command.future
+
+    async def async_add_numbers(self, a, b):
+        logger.debug('Doing writes')
+        await event.gather(
+            self.handler.write(address=self.addresses['intA'], value=a),
+            self.handler.write(address=self.addresses['intB'], value=b),
+            )
+        logger.debug('Doing read')
+        result = await self.handler.read(address=self.addresses['intC'])
+        logger.debug('Got result')
+        return result
 
 
 class AddNumbersCommand(comms.CombinedCommand):
@@ -117,22 +130,18 @@ class AxiAdderTest(object):
         print('Success!!!!!!!!!!!!!!!')
 
 
-def axi_adder_pipe_test(handler):
-    """
-    In this test outputs are received immediately after sending inputs.
-    Inputs cannot depend combinatorially on outputs.
-    """
+async def axi_adder_test(handler):
     comm = AxiAdderComm(address_offset=0, handler=handler)
-    n_data = 20
+    n_data = 100
     max_int = pow(2, 16)-1
     logger.debug('preparing data')
     for i in range(n_data):
-        logger.debug('Running test at index {}'.format(i))
         inta = random.randint(0, max_int)
         intb = random.randint(0, max_int)
-        future = comm.add_numbers(inta, intb)
-        yield TriggerOnFuture(future)
-        assert future.result == inta + intb
+        intc = await comm.async_add_numbers(inta, intb)
+        assert intc == inta + intb
+        logger.info('{} matched'.format(i))
+    raise event.TerminateException()
 
 
 def make_test(entity, generics, top_params):

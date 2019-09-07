@@ -2,12 +2,13 @@
 Python tools for creating and parsing AXI communications.
 '''
 
+import asyncio
 import logging
 import time
 import random
 import collections
 
-from slvcodec import test_utils
+from slvcodec import test_utils, event
 from axilent import dicts, comms
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,6 @@ class ConnCommandHandler(object):
         read_rs = []
         write_rs = []
         for ac in command.get_axi_commands():
-            logger.debug('Sending command for %s.', ac.description)
             if isinstance(ac, comms.FakeWaitCommand):
                 time.sleep(ac.sleep_time)
             else:
@@ -98,6 +98,31 @@ class DictCommandHandler(object):
         return ads
 
 
+class ReadFuture(asyncio.Future):
+
+    def __init__(self):
+        super().__init__(loop=event.LOOP)
+
+
+class WriteFuture(asyncio.Future):
+
+    def __init__(self):
+        super().__init__(loop=event.LOOP)
+
+
+class ReadException(Exception):
+
+    def __init__(resp, data=None):
+        self.resp = resp
+        self.data = data
+
+
+class WriteException(Exception):
+
+    def __init__(resp):
+        self.resp = resp
+
+
 class NamedPipeHandler(object):
     '''
     This handler receives `Command` objects.
@@ -105,62 +130,51 @@ class NamedPipeHandler(object):
     sent to a simulator over named pipes.
     '''
 
-    def __init__(self, in_name, out_name, generators=None, max_cycles=10):
+    def __init__(self, dut, loop, in_name, out_name, default_inputs=None):
+        if default_inputs is None:
+            default_inputs = {'reset': 0}
+        self.default_inputs = default_inputs
+        self.loop = loop
         self.sent_commands = collections.deque()
         self.in_name = in_name
         self.out_name = out_name
         self.unsent_read_addresses = collections.deque()
         self.unsent_write_addresses = collections.deque()
         self.unsent_write_datas = collections.deque()
-        self.read_responses = collections.deque()
-        self.write_responses = collections.deque()
-        self.generators = generators
-        self.max_cycles = max_cycles
+        self.read_futures = collections.deque()
+        self.write_futures = collections.deque()
+        self.dut = dut
+        self.loop = loop
+        self.active = False
 
     def set_input(self, ipt, name, value):
         if self.in_name not in ipt:
             ipt[self.in_name] = {}
-        ipt[self.in_name][name] = value 
+        ipt[self.in_name][name] = value
 
     def get_output(self, opt, name):
         assert self.out_name in opt
         return opt[self.out_name][name]
 
-    def add_axi_command(self, axi_command):
-        read_addresses = []
-        write_addresses = []
-        write_datas = []
-        if axi_command.readorwrite == comms.READ_TYPE:
-            for index in range(axi_command.length):
-                if axi_command.constant_address:
-                    address = axi_command.start_address
-                else:
-                    address = axi_command.start_address + index
-                read_addresses.append(address)
-        else:
-            assert axi_command.readorwrite == comms.WRITE_TYPE
-            for index, data in enumerate(axi_command.data):
-                if axi_command.constant_address:
-                    address = axi_command.start_address
-                else:
-                    address = axi_command.start_address + index
-                write_datas.append(data)
-                write_addresses.append(address)
-        return read_addresses, write_addresses, write_datas
+    async def write(self, address, value):
+        if not self.active:
+            self.loop.create_task(self.communicate())
+            self.active = True
+        self.unsent_write_addresses.append(address)
+        self.unsent_write_datas.append(value)
+        write_future = WriteFuture()
+        self.write_futures.append(write_future)
+        await write_future
 
-    def send(self, command):
-        axi_commands = command.get_axi_commands()
-        n_reads = 0
-        n_writes = 0
-        for axi_command in axi_commands:
-            new_read_addresses, new_write_addresses, new_write_datas = self.add_axi_command(
-                axi_command)
-            self.unsent_read_addresses += new_read_addresses
-            self.unsent_write_addresses += new_write_addresses
-            self.unsent_write_datas += new_write_datas
-            n_reads += len(new_read_addresses)
-            n_writes += len(new_write_addresses)
-        self.sent_commands.append((command, n_reads, n_writes))
+    async def read(self, address):
+        if not self.active:
+            self.loop.create_task(self.communicate())
+            self.active = True
+        self.unsent_read_addresses.append(address)
+        read_future = ReadFuture()
+        self.read_futures.append(read_future)
+        await read_future
+        return read_future.result()
 
     def random_address(self):
         return random.randint(0, pow(2, 32)-1)
@@ -168,23 +182,14 @@ class NamedPipeHandler(object):
     def random_data(self):
         return random.randint(0, pow(2, 32)-1)
 
-    def communicate(self, dut):
-        logger.info('Calling communicate')
-        logger.info('Attaching generators')
-        if self.generators:
-            for generator in self.generators:
-                dut.fork(generator(self))
-        logger.info('Done attaching generators')
+    async def communicate(self):
         ar_valid = 0
         aw_valid = 0
         w_valid = 0
         ar_ready = 0
         aw_ready = 0
         w_ready = 0
-        while True:
-            logger.info('Running communicator')
-            if dut.indices['clk'] > self.max_cycles:
-                break
+        while self.read_futures or self.write_futures:
             if (ar_valid == 0) or (ar_ready == 1):
                 if self.unsent_read_addresses:
                     ar_valid = 1
@@ -208,7 +213,7 @@ class NamedPipeHandler(object):
                     w_data = self.random_data()
             r_ready = random.randint(0, 1)
             b_ready = random.randint(0, 1)
-            ipt = {}
+            ipt = {**self.default_inputs}
             self.set_input(ipt, 'arvalid', ar_valid)
             self.set_input(ipt, 'araddr', ar_addr)
             self.set_input(ipt, 'awvalid', aw_valid)
@@ -217,14 +222,10 @@ class NamedPipeHandler(object):
             self.set_input(ipt, 'wdata', w_data)
             self.set_input(ipt, 'rready', r_ready)
             self.set_input(ipt, 'bready', b_ready)
-            logger.debug('Setting the inputs')
-            dut.set_inputs(ipt)
-            logger.debug(ipt)
-            logger.debug('Yielding trigger on cycle')
-            yield test_utils.TriggerOnCycle(dut)
-            logger.debug('Getting the outputs')
-            opt = dut.get_outputs() 
-            logger.debug(opt)
+            self.dut.set_inputs(ipt)
+            logger.debug('End of cycle')
+            await event.NextCycleFuture()
+            opt = self.dut.get_outputs() 
             ar_ready = self.get_output(opt, 'arready')
             aw_ready = self.get_output(opt, 'awready')
             w_ready = self.get_output(opt, 'wready')
@@ -234,52 +235,21 @@ class NamedPipeHandler(object):
             r_resp = self.get_output(opt, 'rresp')
             r_data = self.get_output(opt, 'rdata')
             if (r_valid == 1) and (r_ready == 1):
-                self.read_responses.append(
-                    comms.AxiResponse(length=1, data=[self.get_output(opt, 'rdata')],
-                                      resp=self.get_output(opt, 'rresp')))
-            if (b_valid == 1) and (b_ready == 1):
-                self.write_responses.append(
-                    comms.AxiResponse(length=1, data=[None],
-                                      resp=self.get_output(opt, 'rresp')))
-            # Now check to see if we can process any of the sent commands
-            n_reads_available = len(self.read_responses)
-            n_writes_available = len(self.write_responses)
-            command_index = 0
-            while True:
-                if  command_index >= len(self.sent_commands):
-                    break
-                command, n_reads, n_writes = self.sent_commands[command_index]
-                enough_reads = len(self.read_responses) >= n_reads
-                enough_writes = len(self.write_responses) >= n_writes
-                n_reads_available -= n_reads
-                n_writes_available -= n_writes
-                logger.debug('Need {} reads and {} writes.  Have {} reads and {} writes'.format(n_reads, n_writes, len(self.read_responses), len(self.write_responses)))
-                if enough_reads and enough_writes:
-                    logger.debug('processing responses')
-                    command.process_responses(self.read_responses, self.write_responses)
-                    self.sent_commands.popleft()
+                read_future = self.read_futures.popleft()
+                rresp = self.get_output(opt, 'rresp')
+                rdata = self.get_output(opt, 'rdata')
+                if rresp == comms.OKAY:
+                    read_future.set_result(rdata)
                 else:
-                    if n_writes:
-                        n_writes_available = 0
-                    if n_reads:
-                        n_reads_available = 0
-                    command_index += 1
-                if (n_writes == 0) and (n_reads == 0):
-                    break
-                assert n_writes_available >= 0
-                assert n_reads_available >= 0
-
-    def get_random_address(self):
-        return random.randint(0, pow(2, 32)-1)
-
-    def get_random_data(self):
-        return random.randint(0, pow(2, 32)-1)
-
-    def get_bready(self):
-        return random.randint(0, 1)
-
-    def get_rready(self):
-        return random.randint(0, 1)
+                    read_future.set_exception(ReadException(rresp, rdata))
+            if (b_valid == 1) and (b_ready == 1):
+                write_future = self.write_futures.popleft()
+                bresp = self.get_output(opt, 'bresp')
+                if bresp == comms.OKAY:
+                    write_future.set_result(None)
+                else:
+                    write_future.set_exception(WriteException(bresp))
+        self.active = False
 
 
 class PYNQHandler(object):
