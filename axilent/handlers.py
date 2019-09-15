@@ -34,8 +34,8 @@ class ConnCommandHandler(object):
         '''
         Sends a Command objects to the FPGA and processes the responses.
         '''
-        read_rs = []
-        write_rs = []
+        read_rs = collections.deque() 
+        write_rs = collections.deque()
         for ac in command.get_axi_commands():
             if isinstance(ac, comms.FakeWaitCommand):
                 time.sleep(ac.sleep_time)
@@ -130,31 +130,21 @@ class NamedPipeHandler(object):
     sent to a simulator over named pipes.
     '''
 
-    def __init__(self, dut, loop, in_name, out_name, default_inputs=None):
+    def __init__(self, loop, m2s, s2m, default_inputs=None):
         if default_inputs is None:
             default_inputs = {'reset': 0}
         self.default_inputs = default_inputs
         self.loop = loop
         self.sent_commands = collections.deque()
-        self.in_name = in_name
-        self.out_name = out_name
         self.unsent_read_addresses = collections.deque()
         self.unsent_write_addresses = collections.deque()
         self.unsent_write_datas = collections.deque()
         self.read_futures = collections.deque()
         self.write_futures = collections.deque()
-        self.dut = dut
+        self.m2s = m2s
+        self.s2m = s2m
         self.loop = loop
         self.active = False
-
-    def set_input(self, ipt, name, value):
-        if self.in_name not in ipt:
-            ipt[self.in_name] = {}
-        ipt[self.in_name][name] = value
-
-    def get_output(self, opt, name):
-        assert self.out_name in opt
-        return opt[self.out_name][name]
 
     async def write(self, address, value):
         if not self.active:
@@ -183,72 +173,46 @@ class NamedPipeHandler(object):
         return random.randint(0, pow(2, 32)-1)
 
     async def communicate(self):
-        ar_valid = 0
-        aw_valid = 0
-        w_valid = 0
-        ar_ready = 0
-        aw_ready = 0
-        w_ready = 0
+        self.m2s.awvalid = 0
+        self.m2s.arvalid = 0
+        self.m2s.wvalid = 0
         while self.read_futures or self.write_futures:
-            if (ar_valid == 0) or (ar_ready == 1):
+            if (self.m2s.arvalid == 0) or (self.s2m.arready == 1):
                 if self.unsent_read_addresses:
-                    ar_valid = 1
-                    ar_addr = self.unsent_read_addresses.popleft()
+                    self.m2s.arvalid = 1
+                    self.m2s.araddr = self.unsent_read_addresses.popleft()
                 else:
-                    ar_valid = 0
-                    ar_addr = self.random_address()
-            if (aw_valid == 0) or (aw_ready == 1):
+                    self.m2s.arvalid = 0
+                    self.m2s.araddr = self.random_address()
+            if (self.m2s.awvalid == 0) or (self.s2m.awready == 1):
                 if self.unsent_write_addresses:
-                    aw_valid = 1
-                    aw_addr = self.unsent_write_addresses.popleft()
+                    self.m2s.awvalid = 1
+                    self.m2s.awaddr = self.unsent_write_addresses.popleft()
                 else:
-                    aw_valid = 0
-                    aw_addr = self.random_address()
-            if (w_valid == 0) or (w_ready == 1):
+                    self.m2s.awvalid = 0
+                    self.m2s.awaddr = self.random_address()
+            if (self.m2s.wvalid == 0) or (self.s2m.wready == 1):
                 if self.unsent_write_datas:
-                    w_valid = 1
-                    w_data = self.unsent_write_datas.popleft()
+                    self.m2s.wvalid = 1
+                    self.m2s.wdata = self.unsent_write_datas.popleft()
                 else:
-                    w_valid = 0
-                    w_data = self.random_data()
-            r_ready = random.randint(0, 1)
-            b_ready = random.randint(0, 1)
-            ipt = {**self.default_inputs}
-            self.set_input(ipt, 'arvalid', ar_valid)
-            self.set_input(ipt, 'araddr', ar_addr)
-            self.set_input(ipt, 'awvalid', aw_valid)
-            self.set_input(ipt, 'awaddr', aw_addr)
-            self.set_input(ipt, 'wvalid', w_valid)
-            self.set_input(ipt, 'wdata', w_data)
-            self.set_input(ipt, 'rready', r_ready)
-            self.set_input(ipt, 'bready', b_ready)
-            self.dut.set_inputs(ipt)
-            logger.debug('End of cycle')
+                    self.m2s.wvalid = 0
+                    self.m2s.wdata = self.random_data()
+            self.m2s.rready = random.randint(0, 1)
+            self.m2s.bready = random.randint(0, 1)
             await event.NextCycleFuture()
-            opt = self.dut.get_outputs() 
-            ar_ready = self.get_output(opt, 'arready')
-            aw_ready = self.get_output(opt, 'awready')
-            w_ready = self.get_output(opt, 'wready')
-            b_valid = self.get_output(opt, 'bvalid')
-            b_resp = self.get_output(opt, 'bresp')
-            r_valid = self.get_output(opt, 'rvalid')
-            r_resp = self.get_output(opt, 'rresp')
-            r_data = self.get_output(opt, 'rdata')
-            if (r_valid == 1) and (r_ready == 1):
+            if (self.s2m.rvalid == 1) and (self.m2s.rready == 1):
                 read_future = self.read_futures.popleft()
-                rresp = self.get_output(opt, 'rresp')
-                rdata = self.get_output(opt, 'rdata')
-                if rresp == comms.OKAY:
-                    read_future.set_result(rdata)
+                if self.s2m.rresp == comms.OKAY:
+                    read_future.set_result(self.s2m.rdata)
                 else:
-                    read_future.set_exception(ReadException(rresp, rdata))
-            if (b_valid == 1) and (b_ready == 1):
+                    read_future.set_exception(ReadException(self.s2m.rresp, self.s2m.rdata))
+            if (self.s2m.bvalid == 1) and (self.m2s.bready == 1):
                 write_future = self.write_futures.popleft()
-                bresp = self.get_output(opt, 'bresp')
-                if bresp == comms.OKAY:
+                if self.s2m.bresp == comms.OKAY:
                     write_future.set_result(None)
                 else:
-                    write_future.set_exception(WriteException(bresp))
+                    write_future.set_exception(WriteException(self.s2m.bresp))
         self.active = False
 
 
@@ -272,8 +236,8 @@ class PYNQHandler(object):
         '''
         Sends a Command objects to the FPGA and processes the responses.
         '''
-        read_rs = []
-        write_rs = []
+        read_rs = collections.deque() 
+        write_rs = collections.deque()
         for ac in command.get_axi_commands():
             logger.debug('Command sent for %s.', ac.description)
             if isinstance(ac, comms.FakeWaitCommand):

@@ -1,3 +1,5 @@
+import collections
+
 from axilent import comms
 
 # Response code for AXI.
@@ -112,9 +114,9 @@ def axi_dicts_to_axi_responses(axi_dicts):
     assert all([d['wready'] for d in axi_dicts if d['wvalid']])
     write_ds = [d for d in axi_dicts if d['bvalid'] and d['bready']]
     read_ds = [d for d in axi_dicts if d['rvalid'] and d['rready']]
-    write_responses = [
-        comms.AxiResponse(length=1, data=[None], resp=d['bresp']) for d in write_ds]
-    read_responses = [
+    write_responses = collections.deque([
+        comms.AxiResponse(length=1, data=[None], resp=d['bresp']) for d in write_ds])
+    read_responses = collections.deque([
         comms.AxiResponse(length=1, data=[d['rdata']], resp=d['rresp'])
-        for d in read_ds]
+        for d in read_ds])
     return read_responses, write_responses

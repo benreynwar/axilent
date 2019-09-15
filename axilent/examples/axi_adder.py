@@ -130,7 +130,10 @@ class AxiAdderTest(object):
         print('Success!!!!!!!!!!!!!!!')
 
 
-async def axi_adder_test(handler):
+async def axi_adder_test(dut, handler):
+    dut.reset = 1
+    await event.NextCycleFuture()
+    dut.reset = 0
     comm = AxiAdderComm(address_offset=0, handler=handler)
     n_data = 100
     max_int = pow(2, 16)-1

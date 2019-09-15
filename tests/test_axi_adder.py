@@ -2,6 +2,8 @@ import os
 import logging
 import shutil
 
+import pytest
+
 from slvcodec import config as slvcodec_config, test_utils, event
 from axilent.examples import axi_adder
 from axilent import coresdir, handlers, config
@@ -11,13 +13,14 @@ testoutput_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '
 
 logger = logging.getLogger(__name__)
 
+fusesoc_config_filename = os.path.join(os.path.dirname(config.__file__), 'fusesoc.conf')
 
 def test_axi_adder():
     tests = axi_adder.get_tests()
-    slvcodec_config.setup_fusesoc(cores_roots=[coresdir])
     vu = slvcodec_config.setup_vunit(argv=['--dont-catch-exceptions'])
     for coretest in tests:
-        test_utils.register_coretest_with_vunit(vu, coretest, testoutput_dir)
+        test_utils.register_coretest_with_vunit(
+            vu, coretest, testoutput_dir, fusesoc_config_filename=fusesoc_config_filename)
     all_ok = vu._main(post_run=None)
     assert all_ok
 
@@ -49,4 +52,4 @@ def test_axi_adder_pipe():
 
 if __name__ == '__main__':
     config.setup_logging(logging.INFO)
-    test_axi_adder_pipe()
+    test_axi_adder()
