@@ -4,7 +4,7 @@
 axilent
 =======
 
-axilent provides python tools for descriping a sequence of Axi4Lite command
+axilent provides python tools for describing a sequence of Axi4Lite command
 in python.
 
 A python test can be written describing the sequence of commands to be sent
