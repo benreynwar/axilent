@@ -145,6 +145,41 @@ async def axi_adder_test(dut, handler):
     cocotb_wrapper.terminate()
 
 
+async def axi_adder_assertions_test(dut):
+    dut.reset = 1
+    await event.NextCycleFuture()
+    dut.reset = 0
+    dut.m2s.awvalid = 1
+    dut.s2m.awready = 1
+    dut.m2s.wvalid = 1
+    dut.s2m.wready = 1
+    dut.s2m.bvalid = 0
+    dut.m2s.bready = 0
+    dut.m2s.arvalid = 0
+    dut.s2m.arready = 0
+    dut.s2m.rvalid = 0
+    dut.m2s.rready = 0
+    await event.NextCycleFuture()
+    print(dut.get())
+    dut.m2s.awvalid = 0
+    dut.s2m.awready = 0
+    dut.m2s.wvalid = 0
+    dut.s2m.wready = 0
+    dut.s2m.bvalid = 1
+    dut.m2s.bready = 1
+    dut.m2s.rready = 1
+    await event.NextCycleFuture()
+    print(dut.get())
+    await event.NextCycleFuture()
+    print(dut.get())
+    dut.s2m.bvalid = 0
+    for i in range(200):
+        await event.NextCycleFuture()
+        print(dut.get())
+    #assert dut.assertions.output.w_mismatch == 1
+    raise event.TerminateException()
+
+
 def make_test(entity, generics, top_params):
     tests = []
     for test_index in range(20):
@@ -166,3 +201,20 @@ def get_tests():
         'generator': make_test,
         }
     return [test]
+
+def convert_to_verilog():
+    working_directory = 'deleteme_axi_adder'
+    core_name = 'axi_adder'
+    parameters = {}
+    config_filename = '/home/ben/Code/axilent/axilent/fusesoc.conf'
+    filenames = fusesoc_wrapper.generate_core(
+        working_directory, core_name, parameters, config_filename=config_filename, tool='vivado')
+    print(filenames)
+    import subprocess
+    for filename in filenames:
+        subprocess.call(['ghdl', '-a', filename])
+    subprocess.call(['yosys', '-m', 'ghdl', '-p', 'ghdl axi_adder; write_verilog axi_adder.v'])
+
+
+if __name__ == '__main__':
+    convert_to_verilog()

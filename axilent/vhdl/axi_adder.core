@@ -6,6 +6,8 @@ description: Example core for adding two numbers with AXI interface.
 filesets:
   default:
     files:
+      - axi_adder_pkg.vhd
+      - axi_adder_assertions.vhd
       - axi_adder.vhd
     file_type: vhdlSource
     depend:

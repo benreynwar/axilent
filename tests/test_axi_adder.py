@@ -3,17 +3,18 @@ import logging
 import shutil
 
 import pytest
-
 from slvcodec import config as slvcodec_config, test_utils, event
+
 from axilent.examples import axi_adder
 from axilent import coresdir, handlers, config
 
-testoutput_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'test_outputs'))
 
+testoutput_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'test_outputs'))
 
 logger = logging.getLogger(__name__)
 
 fusesoc_config_filename = os.path.join(os.path.dirname(config.__file__), 'fusesoc.conf')
+
 
 def test_axi_adder():
     tests = axi_adder.get_tests()
@@ -52,6 +53,21 @@ def test_axi_adder_pipe():
     loop.run_forever()
 
 
-if __name__ == '__main__':
-    config.setup_logging(logging.INFO)
-    test_axi_adder()
+def test_axi_adder_assertions():
+    directory = os.path.join(testoutput_dir, 'axi_adder_assertions')
+    if os.path.exists(directory):
+        shutil.rmtree(directory)
+    os.makedirs(directory)
+
+    top_entity = 'axi_adder_assertions'
+    filenames = [os.path.join(config.basedir, 'vhdl', fn) for fn in (
+        'axi_utils.vhd',
+        'axi_adder_pkg.vhd',
+        'axi_adder_assertions.vhd',
+        )]
+    generics = {'max_delay': 4,}
+
+    simulator = event.Simulator(directory, filenames, top_entity, generics)
+    loop = event.EventLoop(simulator)
+    loop.create_task(axi_adder.axi_adder_assertions_test(simulator.dut))
+    loop.run_forever()

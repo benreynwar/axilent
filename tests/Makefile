@@ -10,6 +10,8 @@ VHDL_SOURCES = \
 # TOPLEVEL is the name of the toplevel module in your Verilog or VHDL file:
 TOPLEVEL=axi_adder_unwrapped
 
+EXTRA_ARGS="-gFORMAL=0"
+
 # MODULE is the name of the Python test file:
 MODULE=test_axi_adder
 
