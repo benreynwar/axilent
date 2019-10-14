@@ -24,7 +24,7 @@ setup(
     keywords=['VHDL', 'hdl', 'rtl', 'FPGA', 'ASIC', 'Xilinx', 'Altera'],
     url='https://github.com/benreynwar/axilent',
     install_requires=[
-    ],
-    dependency_links=[
+        'jinja2>=2.8',
+        'pytest',
     ],
 )

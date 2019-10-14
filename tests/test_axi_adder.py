@@ -13,7 +13,7 @@ testoutput_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '
 
 logger = logging.getLogger(__name__)
 
-fusesoc_config_filename = os.path.join(os.path.dirname(config.__file__), 'fusesoc.conf')
+fusesoc_config_filename = config.get_fusesoc_config_filename()
 
 
 def test_axi_adder():

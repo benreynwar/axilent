@@ -1,7 +1,20 @@
 import os
 import logging
+import jinja2
 
 basedir = os.path.abspath(os.path.dirname(__file__))
+
+
+def get_fusesoc_config_filename():
+    template_filename = os.path.join(basedir, 'fusesoc.conf.j2')
+    output_filename = os.path.join(basedir, 'fusesoc.conf')
+    if not os.path.exists(output_filename):
+        with open(template_filename, 'r') as f:
+            template = jinja2.Template(f.read())
+        content = template.render(basedir=basedir)
+        with open(output_filename, 'w') as f:
+            f.write(content)
+    return output_filename
 
 
 def setup_logging(level):
