@@ -32,10 +32,12 @@ def test_axi_adder_pipe():
     os.makedirs(directory)
 
     top_entity = 'axi_adder'
-    filenames = [
-        '/home/ben/Code/axilent/axilent/vhdl/axi_utils.vhd',
-        '/home/ben/Code/axilent/axilent/vhdl/axi_adder.vhd',
-        ]
+    filenames = [os.path.join(config.basedir, 'vhdl', fn) for fn in (
+        'axi_utils.vhd',
+        'axi_adder_pkg.vhd',
+        'axi_adder_assertions.vhd',
+        'axi_adder.vhd',
+        )]
     generics = {}
 
     simulator = event.Simulator(directory, filenames, top_entity, generics)
