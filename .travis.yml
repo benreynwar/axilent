@@ -5,7 +5,7 @@ python:
 
 os: linux
 sudo: required
-dist: trusty
+dist: bionic
 
 before_install:
   - sudo apt-get update -qq
