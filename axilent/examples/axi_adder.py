@@ -1,9 +1,9 @@
 import logging
 import random
-import asyncio
 
 from slvcodec.test_utils import WrapperTest
-from slvcodec import event
+from slvcodec import event, fusesoc_wrapper, cocotb_wrapper
+
 from axilent.test_utils import DictAxiTest
 from axilent import comms
 
@@ -44,9 +44,10 @@ class AxiAdderComm(object):
         self.handler.send(command)
         return command.future
 
+    @cocotb_wrapper.coroutine
     async def async_add_numbers(self, a, b):
         logger.debug('Doing writes')
-        await event.gather(
+        await cocotb_wrapper.Combine(
             self.handler.write(address=self.addresses['intA'], value=a),
             self.handler.write(address=self.addresses['intB'], value=b),
             )
@@ -131,9 +132,6 @@ class AxiAdderTest(object):
 
 
 async def axi_adder_test(dut, handler):
-    dut.reset = 1
-    await event.NextCycleFuture()
-    dut.reset = 0
     comm = AxiAdderComm(address_offset=0, handler=handler)
     n_data = 100
     max_int = pow(2, 16)-1
@@ -143,8 +141,8 @@ async def axi_adder_test(dut, handler):
         intb = random.randint(0, max_int)
         intc = await comm.async_add_numbers(inta, intb)
         assert intc == inta + intb
-        logger.info('{} matched'.format(i))
-    raise event.TerminateException()
+        logger.debug('{} matched'.format(i))
+    cocotb_wrapper.terminate()
 
 
 def make_test(entity, generics, top_params):

@@ -13,7 +13,7 @@ before_install:
   - sudo apt-get install -y llvm-3.5-dev llvm-3.5-tools libedit-dev
 
 before_script:
-  - pip install --process-dependency-links git+https://github.com/benreynwar/slvcodec@bc39516d30f4695ef40db252d6cc5d8279b6ee4b#egg=slvcodec-0.0.0
+  - pip install --process-dependency-links git+https://github.com/benreynwar/slvcodec@2cb6ef81130d60b387ec0ac6cde78eb419893ff9#egg=slvcodec-0.0.0
   - pip install -e .
   - git clone --depth 1 https://github.com/tgingold/ghdl.git ghdl
   - cd ghdl
@@ -24,6 +24,9 @@ before_script:
   - make install
   - cd ../../
   - export PATH=$PATH:`pwd`/install-ghdl-llvm/bin/
+  - pip install cocotb
                                                                           
 
-script: pytest tests
+script:
+  - pytest tests
+  - cd tests; make
