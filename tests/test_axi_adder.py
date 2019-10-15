@@ -26,7 +26,6 @@ def test_axi_adder():
     assert all_ok
 
 
-@pytest.mark.skip
 def test_axi_adder_pipe():
     directory = os.path.join(testoutput_dir, 'axi_adder_pipe')
     if os.path.exists(directory):
@@ -54,7 +53,6 @@ def test_axi_adder_pipe():
     loop.run_forever()
 
 
-@pytest.mark.skip
 def test_axi_adder_assertions():
     directory = os.path.join(testoutput_dir, 'axi_adder_assertions')
     if os.path.exists(directory):
