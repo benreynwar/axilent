@@ -1,17 +1,21 @@
 import os
+import json
 import logging
-import shutil
+import random
 
-import pytest
-from slvcodec import config as slvcodec_config, test_utils, event
+from slvcodec import cocotb_wrapper as cocotb
+from slvcodec.cocotb_wrapper import triggers, result
+from slvcodec import test_utils, cocotb_utils, cocotb_dut
+from slvcodec import config as slvcode_config
 
 from axilent.examples import axi_adder
-from axilent import coresdir, handlers, config
+from axilent import cocotb_handler, config
 
+
+logger = logging.getLogger(__name__)
 
 testoutput_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'test_outputs'))
 
-logger = logging.getLogger(__name__)
 
 fusesoc_config_filename = config.get_fusesoc_config_filename()
 
@@ -26,50 +30,99 @@ def test_axi_adder():
     assert all_ok
 
 
-@pytest.mark.skip
-def test_axi_adder_pipe():
-    directory = os.path.join(testoutput_dir, 'axi_adder_pipe')
-    if os.path.exists(directory):
-        shutil.rmtree(directory)
-    os.makedirs(directory)
-
-    top_entity = 'axi_adder'
-    filenames = [os.path.join(config.basedir, 'vhdl', fn) for fn in (
-        'axi_utils.vhd',
-        'axi_adder_pkg.vhd',
-        'axi_adder_assertions.vhd',
-        'axi_adder.vhd',
-        )]
-    generics = {}
-
-    simulator = event.Simulator(directory, filenames, top_entity, generics)
-    loop = event.EventLoop(simulator)
-    handler = handlers.NamedPipeHandler(
-        loop=loop,
-        m2s=simulator.dut.m2s,
-        s2m=simulator.dut.s2m,
-        )
-    loop.create_task(handler.communicate())
-    loop.create_task(axi_adder.axi_adder_test(simulator.dut, handler))
-    loop.run_forever()
+@cocotb.coroutine
+async def axi_adder_test(handler):
+    comm = axi_adder.AxiAdderComm(address_offset=0, handler=handler)
+    n_data = 100
+    max_int = pow(2, 16)-1
+    for i in range(n_data):
+        inta = random.randint(0, max_int)
+        intb = random.randint(0, max_int)
+        intc = await comm.add_numbers_async(inta, intb)
+        assert intc == inta + intb
+    raise result.TestSuccess()
 
 
-@pytest.mark.skip
-def test_axi_adder_assertions():
-    directory = os.path.join(testoutput_dir, 'axi_adder_assertions')
-    if os.path.exists(directory):
-        shutil.rmtree(directory)
-    os.makedirs(directory)
+def make_handler(dut):
+    axi_signals = {
+        'awvalid': dut.m2s.awvalid,
+        'awready': dut.s2m.awready,
+        'awaddr': dut.m2s.awaddr,
+        'wvalid': dut.m2s.wvalid,
+        'wready': dut.s2m.wready,
+        'wdata': dut.m2s.wdata,
+        'arvalid': dut.m2s.arvalid,
+        'arready': dut.s2m.arready,
+        'araddr': dut.m2s.araddr,
+        'bvalid': dut.s2m.bvalid,
+        'bready': dut.m2s.bready,
+        'bresp': dut.s2m.bresp,
+        'rvalid': dut.s2m.rvalid,
+        'rready': dut.m2s.rready,
+        'rresp': dut.s2m.rresp,
+        'rdata': dut.s2m.rdata,
+        }
+    axi_handler = cocotb_handler.CocotbHandler(dut.clk, axi_signals)
+    axi_handler.start()
+    return axi_handler
 
-    top_entity = 'axi_adder_assertions'
-    filenames = [os.path.join(config.basedir, 'vhdl', fn) for fn in (
-        'axi_utils.vhd',
-        'axi_adder_pkg.vhd',
-        'axi_adder_assertions.vhd',
-        )]
-    generics = {'max_delay': 4,}
 
-    simulator = event.Simulator(directory, filenames, top_entity, generics)
-    loop = event.EventLoop(simulator)
-    loop.create_task(axi_adder.axi_adder_assertions_test(simulator.dut))
-    loop.run_forever()
+@cocotb.test()
+async def test_axi_adder(dut):
+    params_filename = os.environ['test_params_filename']
+    with open(params_filename) as f:
+        params = json.load(f)
+    mapping = params['mapping']
+    cocotb_dut.apply_mapping(dut, mapping, separator='_')
+    cocotb.fork(cocotb_utils.clock(dut.clk))
+    dut.reset <= 0
+    await triggers.RisingEdge(dut.clk)
+    dut.reset <= 1
+    await triggers.RisingEdge(dut.clk)
+    dut.reset <= 0
+    axi_handler = make_handler(dut)
+    await axi_adder_test(axi_handler)
+
+
+def make_coro(generics, top_params):
+    async def coro(dut, resolved):
+        dut.reset <= 0
+        await triggers.RisingEdge(dut.clk)
+        dut.reset <= 1
+        await triggers.RisingEdge(dut.clk)
+        dut.reset <= 0
+        axi_handler = make_handler(dut)
+        await axi_adder_test(axi_handler)
+    return coro
+
+
+def get_tests():
+    def make_test_params(resolved):
+        return {}
+    test = {
+        'core_name': 'axi_adder',
+        'entity_name': 'axi_adder',
+        'generics': {'formal': False},
+        'top_params': {},
+        'test_module_name': 'test_axi_adder',
+        'test_params': make_test_params,
+        'coro': make_coro,
+        }
+    return [test]
+
+
+def main():
+    tests = get_tests()
+    test_output_directory = os.path.abspath('axi_adder_cocotb')
+    for test in tests:
+        test_utils.run_coretest_with_cocotb(
+            test, test_output_directory, fusesoc_config_filename=config.get_fusesoc_config_filename(),
+            generate_iteratively=False)
+        test_utils.run_coretest_with_pipes(
+            test, test_output_directory, fusesoc_config_filename=config.get_fusesoc_config_filename(),
+            generate_iteratively=False)
+
+
+if __name__ == '__main__':
+    main()
+

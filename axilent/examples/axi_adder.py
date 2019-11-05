@@ -1,10 +1,9 @@
 import logging
 import random
 
-from slvcodec.test_utils import WrapperTest
-from slvcodec import event, fusesoc_wrapper, cocotb_wrapper
+from slvcodec import fusesoc_wrapper
+from slvcodec import cocotb_wrapper as cocotb
 
-from axilent.test_utils import DictAxiTest
 from axilent import comms
 
 
@@ -44,16 +43,24 @@ class AxiAdderComm(object):
         self.handler.send(command)
         return command.future
 
-    @cocotb_wrapper.coroutine
-    async def async_add_numbers(self, a, b):
-        logger.debug('Doing writes')
-        await cocotb_wrapper.Combine(
-            self.handler.write(address=self.addresses['intA'], value=a),
-            self.handler.write(address=self.addresses['intB'], value=b),
-            )
-        logger.debug('Doing read')
-        result = await self.handler.read(address=self.addresses['intC'])
-        logger.debug('Got result')
+    @cocotb.coroutine
+    async def add_numbers_async(self, a, b):
+        write_a_and_b_command = comms.CombinedCommand((
+            comms.SetUnsignedCommand(
+                address=self.addresses['intA'], value=a,
+                description='Setting A in AddNumbers',
+            ),
+            comms.SetUnsignedCommand(
+                address=self.addresses['intB'], value=b,
+                description='Setting B in AddNumbers',
+            ),
+            ), description='Setting A and B in AddNumbers')
+        await self.handler.send_single_command(write_a_and_b_command)
+        read_c_command = comms.GetUnsignedCommand(
+            address=self.addresses['intC'],
+            description='Getting C from AddNumbers',
+        )
+        result = await self.handler.send_single_command(read_c_command)
         return result
 
 
@@ -131,77 +138,6 @@ class AxiAdderTest(object):
         print('Success!!!!!!!!!!!!!!!')
 
 
-async def axi_adder_test(dut, handler):
-    comm = AxiAdderComm(address_offset=0, handler=handler)
-    n_data = 100
-    max_int = pow(2, 16)-1
-    logger.debug('preparing data')
-    for i in range(n_data):
-        inta = random.randint(0, max_int)
-        intb = random.randint(0, max_int)
-        intc = await comm.async_add_numbers(inta, intb)
-        assert intc == inta + intb
-        logger.debug('{} matched'.format(i))
-    cocotb_wrapper.terminate()
-
-
-async def axi_adder_assertions_test(dut):
-    dut.reset = 1
-    await event.NextCycleFuture()
-    dut.reset = 0
-    dut.m2s.awvalid = 1
-    dut.s2m.awready = 1
-    dut.m2s.wvalid = 1
-    dut.s2m.wready = 1
-    dut.s2m.bvalid = 0
-    dut.m2s.bready = 0
-    dut.m2s.arvalid = 0
-    dut.s2m.arready = 0
-    dut.s2m.rvalid = 0
-    dut.m2s.rready = 0
-    await event.NextCycleFuture()
-    print(dut.get())
-    dut.m2s.awvalid = 0
-    dut.s2m.awready = 0
-    dut.m2s.wvalid = 0
-    dut.s2m.wready = 0
-    dut.s2m.bvalid = 1
-    dut.m2s.bready = 1
-    dut.m2s.rready = 1
-    await event.NextCycleFuture()
-    print(dut.get())
-    await event.NextCycleFuture()
-    print(dut.get())
-    dut.s2m.bvalid = 0
-    for i in range(200):
-        await event.NextCycleFuture()
-        print(dut.get())
-    #assert dut.assertions.output.w_mismatch == 1
-    raise event.TerminateException()
-
-
-def make_test(entity, generics, top_params):
-    tests = []
-    for test_index in range(20):
-        terminate_early = random.choice([True, False])
-        axi_test = AxiAdderTest()
-        tests.append(DictAxiTest(axi_test, terminate_early))
-    combined_test = WrapperTest(tests)
-    return combined_test
-
-
-def get_tests():
-    test = {
-        'core_name': 'axi_adder',
-        'entity_name': 'axi_adder',
-        'param_sets': [{
-            'generic_sets': [{}],
-            'top_params': {}
-        }],
-        'generator': make_test,
-        }
-    return [test]
-
 def convert_to_verilog():
     working_directory = 'deleteme_axi_adder'
     core_name = 'axi_adder'
@@ -216,5 +152,7 @@ def convert_to_verilog():
     subprocess.call(['yosys', '-m', 'ghdl', '-p', 'ghdl axi_adder; write_verilog axi_adder.v'])
 
 
+
 if __name__ == '__main__':
     convert_to_verilog()
+
