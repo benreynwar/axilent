@@ -6,7 +6,7 @@ import random
 from slvcodec import cocotb_wrapper as cocotb
 from slvcodec.cocotb_wrapper import triggers, result
 from slvcodec import test_utils, cocotb_utils, cocotb_dut
-from slvcodec import config as slvcode_config
+from slvcodec import config as slvcodec_config
 
 from axilent.examples import axi_adder
 from axilent import cocotb_handler, config
