@@ -5,7 +5,7 @@ import random
 
 from slvcodec import cocotb_wrapper as cocotb
 from slvcodec.cocotb_wrapper import triggers, result
-from slvcodec import test_utils, cocotb_utils, cocotb_dut
+from slvcodec import test_utils, cocotb_dut
 from slvcodec import config as slvcodec_config
 
 from axilent.examples import axi_adder
@@ -74,7 +74,7 @@ async def test_axi_adder(dut):
         params = json.load(f)
     mapping = params['mapping']
     cocotb_dut.apply_mapping(dut, mapping, separator='_')
-    cocotb.fork(cocotb_utils.clock(dut.clk))
+    cocotb.fork(test_utils.clock(dut.clk))
     dut.reset <= 0
     await triggers.RisingEdge(dut.clk)
     dut.reset <= 1
@@ -125,4 +125,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
