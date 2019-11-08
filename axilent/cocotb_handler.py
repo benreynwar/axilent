@@ -1,5 +1,6 @@
 import logging
-from collections import deque
+import random
+from collections import deque, namedtuple
 
 from slvcodec import cocotb_wrapper as cocotb
 from slvcodec.cocotb_wrapper import triggers
@@ -61,6 +62,9 @@ def make_axi_signals_from_interfaces(m2s, s2m):
     return axi_signals
 
 
+QueueInfo = namedtuple('QueueInfo', ['throttle'])
+
+
 class CocotbHandler(object):
     '''
     This handler receives `Command` objects and sends their AXI
@@ -107,7 +111,8 @@ class CocotbHandler(object):
         self.r_queue = deque()
         self.command_queue = deque()
 
-    def start(self):
+    def start(self, aw_throttle=0.8, w_throttle=0.8, b_throttle=0.8,
+              ar_throttle=0.8, r_throttle=0.8):
         """
         Activate the handler and start applying queued commands to the
         simulation.
@@ -117,30 +122,35 @@ class CocotbHandler(object):
             self.signals['awvalid'],
             self.signals['awready'],
             self.signals['awaddr'],
+            QueueInfo(throttle=aw_throttle),
         ))
         cocotb.fork(self.process_queue_out(
             self.w_queue,
             self.signals['wvalid'],
             self.signals['wready'],
             self.signals['wdata'],
+            QueueInfo(throttle=w_throttle),
         ))
         cocotb.fork(self.process_queue_in(
             self.b_queue,
             self.signals['bvalid'],
             self.signals['bready'],
             self.signals['bresp'],
+            QueueInfo(throttle=b_throttle),
         ))
         cocotb.fork(self.process_queue_out(
             self.ar_queue,
             self.signals['arvalid'],
             self.signals['arready'],
             self.signals['araddr'],
+            QueueInfo(throttle=ar_throttle),
         ))
         cocotb.fork(self.process_queue_in(
             self.r_queue,
             self.signals['rvalid'],
             self.signals['rready'],
             self.signals['rresp'],
+            QueueInfo(throttle=r_throttle),
             self.signals['rdata'],
         ))
 
@@ -216,19 +226,21 @@ class CocotbHandler(object):
         return data
 
     @cocotb.coroutine
-    async def process_queue_out(self, queue, valid_signal, ready_signal, data_signal):
+    async def process_queue_out(self, queue, valid_signal, ready_signal, data_signal, queue_info):
         """
         Send data from a queue into the simulation using valid/ready hand shaking.
         """
         while True:
             if queue:
                 value = queue.popleft()
-                valid_signal <= 1
-                data_signal <= value
                 while True:
+                    valid = 1 if random.random() < queue_info.throttle else 0
+                    valid_signal <= valid
+                    if valid:
+                        data_signal <= value
                     await triggers.ReadOnly()
                     assert str(ready_signal) in ('0', '1')
-                    consumed = ready_signal == 1
+                    consumed = (ready_signal == 1) and valid
                     await triggers.RisingEdge(self.clock_signal)
                     if consumed:
                         break
@@ -237,16 +249,17 @@ class CocotbHandler(object):
                 await triggers.RisingEdge(self.clock_signal)
 
     @cocotb.coroutine
-    async def process_queue_in(self, queue, valid_signal, ready_signal, resp_signal, data_signal=None):
+    async def process_queue_in(self, queue, valid_signal, ready_signal, resp_signal, queue_info, data_signal=None):
         """
         Take data from the simulation using valid/ready shaking.
         Take an 'Event' from a queue and apply the received data to that event.
         """
-        ready_signal <= 1
         while True:
+            ready = 1 if random.random() < queue_info.throttle else 0
+            ready_signal <= ready
             await triggers.ReadOnly()
             assert str(valid_signal) in ('0', '1')
-            if valid_signal == 1:
+            if (valid_signal == 1) and ready:
                 event = queue.popleft()
                 if data_signal is not None:
                     event.set((resp_signal.value, data_signal.value))
