@@ -15,7 +15,51 @@ def signal_to_integer(s):
         return None
     else:
         return s.value.integer
-    
+
+
+def make_axi_signals_from_prefixs(dut, m2s_prefix, s2m_prefix):
+    axi_signals = {
+        'awvalid': getattr(dut, m2s_prefix + 'awvalid'),
+        'awaddr': getattr(dut, m2s_prefix + 'awaddr'),
+        'awready': getattr(dut, s2m_prefix + 'awready'),
+        'wvalid': getattr(dut, m2s_prefix + 'wvalid'),
+        'wdata': getattr(dut, m2s_prefix + 'wdata'),
+        'wready': getattr(dut, s2m_prefix + 'wready'),
+        'bvalid': getattr(dut, s2m_prefix + 'bvalid'),
+        'bresp': getattr(dut, s2m_prefix + 'bresp'),
+        'bready': getattr(dut, m2s_prefix + 'bready'),
+        'arvalid': getattr(dut, m2s_prefix + 'arvalid'),
+        'araddr': getattr(dut, m2s_prefix + 'araddr'),
+        'arready': getattr(dut, s2m_prefix + 'arready'),
+        'rvalid': getattr(dut, s2m_prefix + 'rvalid'),
+        'rresp': getattr(dut, s2m_prefix + 'rresp'),
+        'rdata': getattr(dut, s2m_prefix + 'rdata'),
+        'rready': getattr(dut, m2s_prefix + 'rready'),
+        }
+    return axi_signals
+
+
+def make_axi_signals_from_interfaces(m2s, s2m):
+    axi_signals = {
+        'awvalid': m2s.awvalid,
+        'awaddr': m2s.awaddr,
+        'awready': s2m.awready,
+        'wvalid': m2s.wvalid,
+        'wdata': m2s.wdata,
+        'wready': s2m.wready,
+        'bvalid': s2m.bvalid,
+        'bresp': s2m.bresp,
+        'bready': m2s.bready,
+        'arvalid': m2s.arvalid,
+        'araddr': m2s.araddr,
+        'arready': s2m.arready,
+        'rvalid': s2m.rvalid,
+        'rresp': s2m.rresp,
+        'rdata': s2m.rdata,
+        'rready': m2s.rready,
+        }
+    return axi_signals
+
 
 class CocotbHandler(object):
     '''
@@ -23,21 +67,51 @@ class CocotbHandler(object):
     commands into a cocotb simulation.
     '''
 
-    def __init__(self, clock_signal, axi_signals):
+    def __init__(self, clock_signal, axi_signals=None,
+                 dut=None, m2s_prefix=None, s2m_prefix=None,
+                 m2s=None, s2m=None):
         '''
-        `clock_signal`: The signal for the clock.
-        `axi_signals`: A dictionary relating signal names to the cocotb signal objects.
+        Args: 
+          `clock_signal`: The signal for the clock.
+          `axi_signals`: A dictionary relating signal names to the cocotb signal objects.
+          `dut`, `m2s_prefix`, `s2m_prefix`: Alternately the axi signals can be constructed
+             from the dut interface and the names of the prefixes for the m2s and s2m signals.
+          `m2s`, `s2m`: Or the objects for the interfaces to the m2s and s2m signal bundles
+             can be directly passed.
         '''
+        if axi_signals is not None:
+            assert m2s_prefix is None
+            assert s2m_prefix is None
+            assert m2s is None
+            assert s2m is None
+            self.signals = axi_signals
+        elif m2s_prefix is not None:
+            assert s2m_prefix is not None
+            assert m2s is None
+            assert s2m is None
+            self.signals = make_axi_signals_from_prefixs(dut, m2s_prefix, s2m_prefix)
+        else:
+            assert m2s is not None
+            assert s2m is not None
+            assert s2m_prefix is None
+            self.signals = make_axi_signals_from_interfaces(m2s, s2m)
         self.clock_signal = clock_signal
-        self.signals = axi_signals
+        # Queues for storing 'w', 'aw', 'ar' commands until
+        # they are sent into the simulation.
         self.w_queue = deque()
         self.aw_queue = deque()
-        self.b_queue = deque()
         self.ar_queue = deque()
+        # Queues for storing expectations of replies on the
+        # 'b' and 'r' channels.
+        self.b_queue = deque()
         self.r_queue = deque()
         self.command_queue = deque()
 
     def start(self):
+        """
+        Activate the handler and start applying queued commands to the
+        simulation.
+        """
         cocotb.fork(self.process_queue_out(
             self.aw_queue,
             self.signals['awvalid'],
@@ -70,19 +144,10 @@ class CocotbHandler(object):
             self.signals['rdata'],
         ))
 
-    def send(self, command):
-        self.command_queue.append(command)
-
     @cocotb.coroutine
-    async def send_stored_commands(self):
-        while self.command_queue:
-            command = self.command_queue.popleft()
-            await self.send_single_command(command)
-
-    @cocotb.coroutine
-    async def send_single_command(self, command):
+    async def send(self, command):
         '''
-        Sends a Command objects to the FPGA and processes the responses.
+        Sends a Command objects to the simulation and processes the responses.
         '''
         read_events = []
         write_events = []
@@ -152,6 +217,9 @@ class CocotbHandler(object):
 
     @cocotb.coroutine
     async def process_queue_out(self, queue, valid_signal, ready_signal, data_signal):
+        """
+        Send data from a queue into the simulation using valid/ready hand shaking.
+        """
         while True:
             if queue:
                 value = queue.popleft()
@@ -170,12 +238,13 @@ class CocotbHandler(object):
 
     @cocotb.coroutine
     async def process_queue_in(self, queue, valid_signal, ready_signal, resp_signal, data_signal=None):
+        """
+        Take data from the simulation using valid/ready shaking.
+        Take an 'Event' from a queue and apply the received data to that event.
+        """
         ready_signal <= 1
         while True:
             await triggers.ReadOnly()
-            if str(valid_signal) not in ('0', '1'):
-                import pdb
-                pdb.set_trace()
             assert str(valid_signal) in ('0', '1')
             if valid_signal == 1:
                 event = queue.popleft()

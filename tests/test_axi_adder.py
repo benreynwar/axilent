@@ -44,25 +44,7 @@ async def axi_adder_test(handler):
 
 
 def make_handler(dut):
-    axi_signals = {
-        'awvalid': dut.m2s.awvalid,
-        'awready': dut.s2m.awready,
-        'awaddr': dut.m2s.awaddr,
-        'wvalid': dut.m2s.wvalid,
-        'wready': dut.s2m.wready,
-        'wdata': dut.m2s.wdata,
-        'arvalid': dut.m2s.arvalid,
-        'arready': dut.s2m.arready,
-        'araddr': dut.m2s.araddr,
-        'bvalid': dut.s2m.bvalid,
-        'bready': dut.m2s.bready,
-        'bresp': dut.s2m.bresp,
-        'rvalid': dut.s2m.rvalid,
-        'rready': dut.m2s.rready,
-        'rresp': dut.s2m.rresp,
-        'rdata': dut.s2m.rdata,
-        }
-    axi_handler = cocotb_handler.CocotbHandler(dut.clk, axi_signals)
+    axi_handler = cocotb_handler.CocotbHandler(dut.clk, m2s=dut.m2s, s2m=dut.s2m)
     axi_handler.start()
     return axi_handler
 
@@ -80,6 +62,7 @@ async def test_axi_adder(dut):
     dut.reset <= 1
     await triggers.RisingEdge(dut.clk)
     dut.reset <= 0
+    await triggers.RisingEdge(dut.clk)
     axi_handler = make_handler(dut)
     await axi_adder_test(axi_handler)
 

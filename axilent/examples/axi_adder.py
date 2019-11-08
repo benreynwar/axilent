@@ -55,12 +55,12 @@ class AxiAdderComm(object):
                 description='Setting B in AddNumbers',
             ),
             ), description='Setting A and B in AddNumbers')
-        await self.handler.send_single_command(write_a_and_b_command)
+        await self.handler.send(write_a_and_b_command)
         read_c_command = comms.GetUnsignedCommand(
             address=self.addresses['intC'],
             description='Getting C from AddNumbers',
         )
-        result = await self.handler.send_single_command(read_c_command)
+        result = await self.handler.send(read_c_command)
         return result
 
 
