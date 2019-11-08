@@ -5,11 +5,12 @@ import random
 
 from slvcodec import cocotb_wrapper as cocotb
 from slvcodec.cocotb_wrapper import triggers, result
-from slvcodec import test_utils, cocotb_dut
+from slvcodec import cocotb_dut
+from slvcodec import test_utils as slvcodec_test_utils
 from slvcodec import config as slvcodec_config
 
 from axilent.examples import axi_adder
-from axilent import cocotb_handler, config
+from axilent import cocotb_handler, config, test_utils
 
 
 logger = logging.getLogger(__name__)
@@ -21,10 +22,10 @@ fusesoc_config_filename = config.get_fusesoc_config_filename()
 
 
 def test_axi_adder():
-    tests = axi_adder.get_tests()
+    tests = get_tests()
     vu = slvcodec_config.setup_vunit(argv=['--dont-catch-exceptions'])
     for coretest in tests:
-        test_utils.register_coretest_with_vunit(
+        slvcodec_test_utils.register_coretest_with_vunit(
             vu, coretest, testoutput_dir, fusesoc_config_filename=fusesoc_config_filename)
     all_ok = vu._main(post_run=None)
     assert all_ok
@@ -50,13 +51,13 @@ def make_handler(dut):
 
 
 @cocotb.test()
-async def test_axi_adder(dut):
+async def axi_adder_test_top(dut):
     params_filename = os.environ['test_params_filename']
     with open(params_filename) as f:
         params = json.load(f)
     mapping = params['mapping']
     cocotb_dut.apply_mapping(dut, mapping, separator='_')
-    cocotb.fork(test_utils.clock(dut.clk))
+    cocotb.fork(slvcodec_test_utils.clock(dut.clk))
     dut.reset <= 0
     await triggers.RisingEdge(dut.clk)
     dut.reset <= 1
@@ -78,6 +79,10 @@ def make_coro(generics, top_params):
         await axi_adder_test(axi_handler)
     return coro
 
+def make_ftb_test(generics, top_params, resolved):
+    axi_test = axi_adder.AxiAdderTest()
+    test = test_utils.DictAxiTest(axi_test)
+    return test
 
 def get_tests():
     def make_test_params(resolved):
@@ -90,21 +95,30 @@ def get_tests():
         'test_module_name': 'test_axi_adder',
         'test_params': make_test_params,
         'coro': make_coro,
+        'generator': make_ftb_test,
         }
     return [test]
 
 
-def main():
-    tests = get_tests()
+def test_cocotb():
     test_output_directory = os.path.abspath('axi_adder_cocotb')
+    tests = get_tests()
     for test in tests:
-        test_utils.run_coretest_with_cocotb(
-            test, test_output_directory, fusesoc_config_filename=config.get_fusesoc_config_filename(),
+        slvcodec_test_utils.run_coretest_with_cocotb(
+            test, test_output_directory,
+            fusesoc_config_filename=config.get_fusesoc_config_filename(),
             generate_iteratively=False)
-        test_utils.run_coretest_with_pipes(
-            test, test_output_directory, fusesoc_config_filename=config.get_fusesoc_config_filename(),
+
+
+def test_pipes():
+    test_output_directory = os.path.abspath('axi_adder_pipes')
+    tests = get_tests()
+    for test in tests:
+        slvcodec_test_utils.run_coretest_with_pipes(
+            test, test_output_directory,
+            fusesoc_config_filename=config.get_fusesoc_config_filename(),
             generate_iteratively=False)
 
 
 if __name__ == '__main__':
-    main()
+    test_cocotb()
