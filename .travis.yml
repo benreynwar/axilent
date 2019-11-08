@@ -12,9 +12,7 @@ before_install:
   - sudo apt-get install -y gnat zlib1g-dev
 
 before_script:
-  - pip install git+https://github.com/benreynwar/slvcodec@2cb6ef81130d60b387ec0ac6cde78eb419893ff9#egg=slvcodec-0.0.0
-  - pip install git+https://github.com/cocotb/cocotb@0965b5a53a0d7e2ed4440af902f2d62b1525e14f#egg=cocotb-0.0.0
-  - pip install fusesoc pytest vunit-hdl
+  - pip install fusesoc
   - pip install -e .
   - git clone --depth 1 https://github.com/ghdl/ghdl.git ghdl
   - cd ghdl
