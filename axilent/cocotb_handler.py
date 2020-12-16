@@ -278,7 +278,7 @@ class CocotbHandler(object):
             if (valid_signal == 1) and ready:
                 event = queue.popleft()
                 if data_signal is not None:
-                    event.set((int(resp_signal), data_signal.value))
+                    event.set((resp_signal.value, data_signal.value))
                 else:
-                    event.set((int(resp_signal), None))
+                    event.set((resp_signal.value, None))
             await triggers.RisingEdge(self.clock_signal)
