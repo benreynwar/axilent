@@ -85,13 +85,16 @@ class Command(object):
         return e, r
 
 
+WORD_SIZE = 4
+
+
 class AxiCommand(Command):
     '''
     Defines a series AXI4Lite master-to-slave commands.
     '''
 
     def __init__(self, start_address, length, readorwrite, data=None,
-                 constant_address=False, description=None):
+                 constant_address=False, description=None, address_by_word=True):
         '''
         `start_address`: The address on which the first AXI command operates.
         `constant_address`: If this is `True` we keep operating on the same
@@ -106,6 +109,7 @@ class AxiCommand(Command):
         self.length = length
         self.readorwrite = readorwrite
         self.constant_address = constant_address
+        self.address_by_word = address_by_word
         assert readorwrite in (READ_TYPE, WRITE_TYPE)
         self.data = data
         if readorwrite == READ_TYPE:
@@ -114,7 +118,10 @@ class AxiCommand(Command):
             assert len(self.data) == length
         assert start_address <= max_address
         if not constant_address:
-            assert start_address + length-1 <= max_address
+            if address_by_word:
+                assert start_address + length-1 <= max_address
+            else:
+                assert start_address + (length-1) * WORD_SIZE <= max_address
         assert description
         super().__init__(description)
 
@@ -169,7 +176,7 @@ class AxiCommand(Command):
 class SetUnsignedsCommand(AxiCommand):
 
     def __init__(self, values, address, description=None,
-                 constant_address=False):
+                 constant_address=False, address_by_word=True):
         for value in values:
             assert value < pow(2, 32)
         super().__init__(
@@ -178,6 +185,7 @@ class SetUnsignedsCommand(AxiCommand):
             readorwrite=WRITE_TYPE,
             data=values,
             constant_address=constant_address,
+            address_by_word=address_by_word,
             description=description,
         )
 
