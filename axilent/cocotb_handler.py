@@ -180,13 +180,19 @@ class CocotbHandler(object):
                     for offset, d in enumerate(ac.data):
                         address = ac.start_address
                         if not ac.constant_address:
-                            address += offset
+                            if ac.address_by_word:
+                                address += offset
+                            else:
+                                address += offset * 4
                         write_events.append(self.submit_write(address, d))
                 else:
                     for index in range(ac.length):
                         address = ac.start_address
                         if not ac.constant_address:
-                            address += index
+                            if ac.address_by_word:
+                                address += index
+                            else:
+                                address += index * 4
                         read_events.append(self.submit_read(address))
 
         for index, event in enumerate(write_events):
