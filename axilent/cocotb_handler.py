@@ -4,6 +4,7 @@ from collections import deque, namedtuple
 
 from slvcodec import cocotb_wrapper as cocotb
 from slvcodec.cocotb_wrapper import triggers
+from slvcodec import cocotb_helper
 
 from axilent import comms
 
@@ -73,7 +74,7 @@ class CocotbHandler(object):
 
     def __init__(self, clock_signal, axi_signals=None,
                  dut=None, m2s_prefix=None, s2m_prefix=None,
-                 m2s=None, s2m=None, random_seed=None):
+                 m2s=None, s2m=None, random_seed=None, helper=None):
         '''
         Args: 
           `clock_signal`: The signal for the clock.
@@ -99,6 +100,9 @@ class CocotbHandler(object):
             assert s2m is not None
             assert s2m_prefix is None
             self.signals = make_axi_signals_from_interfaces(m2s, s2m)
+        if helper is None:
+            helper = cocotb_helper.TaskHelper()
+        self.helper = helper
         self.clock_signal = clock_signal
         # Queues for storing 'w', 'aw', 'ar' commands until
         # they are sent into the simulation.
@@ -118,7 +122,7 @@ class CocotbHandler(object):
         Activate the handler and start applying queued commands to the
         simulation.
         """
-        cocotb.fork(self.process_queue_out(
+        self.helper.fork(self.process_queue_out(
             self.aw_queue,
             self.signals['awvalid'],
             self.signals['awready'],
@@ -126,7 +130,7 @@ class CocotbHandler(object):
             QueueInfo(throttle=aw_throttle),
             random_seed=None if self.random_seed is None else self.random_seed + 10000,
         ))
-        cocotb.fork(self.process_queue_out(
+        self.helper.fork(self.process_queue_out(
             self.w_queue,
             self.signals['wvalid'],
             self.signals['wready'],
@@ -134,7 +138,7 @@ class CocotbHandler(object):
             QueueInfo(throttle=w_throttle),
             random_seed=None if self.random_seed is None else self.random_seed + 20000,
         ))
-        cocotb.fork(self.process_queue_in(
+        self.helper.fork(self.process_queue_in(
             self.b_queue,
             self.signals['bvalid'],
             self.signals['bready'],
@@ -142,7 +146,7 @@ class CocotbHandler(object):
             QueueInfo(throttle=b_throttle),
             random_seed=None if self.random_seed is None else self.random_seed + 30000,
         ))
-        cocotb.fork(self.process_queue_out(
+        self.helper.fork(self.process_queue_out(
             self.ar_queue,
             self.signals['arvalid'],
             self.signals['arready'],
@@ -150,7 +154,7 @@ class CocotbHandler(object):
             QueueInfo(throttle=ar_throttle),
             random_seed=None if self.random_seed is None else self.random_seed + 40000,
         ))
-        cocotb.fork(self.process_queue_in(
+        self.helper.fork(self.process_queue_in(
             self.r_queue,
             self.signals['rvalid'],
             self.signals['rready'],
@@ -160,7 +164,6 @@ class CocotbHandler(object):
             random_seed=None if self.random_seed is None else self.random_seed + 50000,
         ))
 
-    @cocotb.coroutine
     async def send(self, command):
         '''
         Sends a Command objects to the simulation and processes the responses.
@@ -170,7 +173,7 @@ class CocotbHandler(object):
         for ac in command.get_axi_commands():
             if isinstance(ac, comms.FakeWaitCommand):
                 for dummy_index in range(ac.clock_cycles):
-                    await triggers.RisingEdge(self.clock_signal)
+                    await self.helper.RisingEdge(self.clock_signal)
             else:
                 assert(ac.readorwrite in (comms.WRITE_TYPE, comms.READ_TYPE))
                 if ac.readorwrite == comms.WRITE_TYPE:
@@ -207,7 +210,6 @@ class CocotbHandler(object):
         self.b_queue.append(event)
         return event
 
-    @cocotb.coroutine
     async def write(self, address, value):
         event = self.submit_write(address, value)
         await event.wait()
@@ -222,7 +224,6 @@ class CocotbHandler(object):
         self.r_queue.append(event)
         return event
 
-    @cocotb.coroutine
     async def read(self, address):
         event = self.submit_read(address)
         await event.wait()
@@ -231,8 +232,8 @@ class CocotbHandler(object):
             raise comms.AxiResponseException('Bad response: {}'.format(response))
         return data
 
-    @cocotb.coroutine
-    async def process_queue_out(self, queue, valid_signal, ready_signal, data_signal, queue_info,
+    @cocotb_helper.killable
+    async def process_queue_out(helper, self, queue, valid_signal, ready_signal, data_signal, queue_info,
                                 random_seed=None):
         """
         Send data from a queue into the simulation using valid/ready hand shaking.
@@ -246,18 +247,18 @@ class CocotbHandler(object):
                     valid_signal <= valid
                     if valid:
                         data_signal <= value
-                    await triggers.ReadOnly()
+                    await helper.ReadOnly()
                     assert str(ready_signal) in ('0', '1')
                     consumed = (ready_signal == 1) and valid
-                    await triggers.RisingEdge(self.clock_signal)
+                    await helper.RisingEdge(self.clock_signal)
                     if consumed:
                         break
             else:
                 valid_signal <= 0
-                await triggers.RisingEdge(self.clock_signal)
+                await helper.RisingEdge(self.clock_signal)
 
-    @cocotb.coroutine
-    async def process_queue_in(self, queue, valid_signal, ready_signal, resp_signal, queue_info,
+    @cocotb_helper.killable
+    async def process_queue_in(helper, self, queue, valid_signal, ready_signal, resp_signal, queue_info,
                                data_signal=None, random_seed=None):
         """
         Take data from the simulation using valid/ready shaking.
@@ -267,12 +268,12 @@ class CocotbHandler(object):
         while True:
             ready = 1 if rnd.random() < queue_info.throttle else 0
             ready_signal <= ready
-            await triggers.ReadOnly()
+            await helper.ReadOnly()
             assert str(valid_signal) in ('0', '1')
             if (valid_signal == 1) and ready:
                 event = queue.popleft()
                 if data_signal is not None:
-                    event.set((int(resp_signal), data_signal.value))
+                    event.set((resp_signal.value, data_signal.value))
                 else:
-                    event.set((int(resp_signal), None))
-            await triggers.RisingEdge(self.clock_signal)
+                    event.set((resp_signal.value, None))
+            await helper.RisingEdge(self.clock_signal)
