@@ -26,6 +26,6 @@ setup(
     install_requires=[
         'jinja2>=2.8',
         'pytest',
-        'slvcodec>=0.4.9',
+        'slvcodec>=0.4.10',
     ],
 )
