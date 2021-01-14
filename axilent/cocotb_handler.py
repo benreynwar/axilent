@@ -3,7 +3,6 @@ import random
 from collections import deque, namedtuple
 
 from slvcodec import cocotb_wrapper as cocotb
-from slvcodec.cocotb_wrapper import triggers
 from slvcodec import cocotb_helper
 
 from axilent import comms
@@ -210,7 +209,7 @@ class CocotbHandler(object):
         return command.future.result()
 
     def submit_write(self, address, value):
-        event = triggers.Event()
+        event = self.helper.Event()
         self.aw_queue.append(address)
         self.w_queue.append(value)
         self.b_queue.append(event)
@@ -225,7 +224,7 @@ class CocotbHandler(object):
         return data
 
     def submit_read(self, address):
-        event = triggers.Event()
+        event = self.helper.Event()
         self.ar_queue.append(address)
         self.r_queue.append(event)
         return event
